@@ -358,3 +358,8 @@ client_session: <aiohttp.client.ClientSession object at 0x7fb9b2008d70>
 2025-10-02 19:36:00,213 - asyncio - ERROR - Unclosed connector
 connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x7fb9b2f3f650>, 1420670.802883871)])']
 connector: <aiohttp.connector.TCPConnector object at 0x7fb9b2008980>
+2025-10-02 22:45:54,273 - MasterAgent - INFO - 🤖 Master Agent đang phân tích BTCUSD với AI models...
+2025-10-02 22:45:54,278 - MasterAgent - WARNING - Ensemble model error: 'MockEnsembleModel' object has no attribute 'models'
+2025-10-02 22:45:54,278 - MasterAgent - WARNING - LSTM model error: 'MockLSTMModel' object has no attribute 'is_trained'
+2025-10-02 22:45:54,278 - MasterAgent - WARNING - RL Agent error: 'bool' object has no attribute 'predict'
+2025-10-02 22:45:54,278 - MasterAgent - INFO - ✅ Master Agent quyết định: BUY BTCUSD với confidence 1.00 (AI-Enhanced)
