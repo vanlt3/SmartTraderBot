@@ -299,6 +299,13 @@ class APIManager:
         """Async context manager exit"""
         if self.session:
             await self.session.close()
+            self.session = None
+    
+    async def close(self):
+        """Close the session manually"""
+        if self.session:
+            await self.session.close()
+            self.session = None
     
     def _check_rate_limit(self, api_name: str) -> bool:
         """Kiểm tra rate limit cho API"""
@@ -334,6 +341,9 @@ class APIManager:
         # Kiểm tra session và tự động khởi tạo lại nếu cần
         if not self.session or self.session.closed:
             self.logger.warning(f"Session is closed cho {api_name}, đang khởi tạo lại...")
+            # Properly close existing session before creating new one
+            if self.session and not self.session.closed:
+                await self.session.close()
             await self.__aenter__()
         
         # Kiểm tra rate limit
@@ -2032,31 +2042,55 @@ class MasterAgent:
             # Ensemble Model prediction
             if self.ensemble_model and hasattr(self.ensemble_model, 'predict'):
                 try:
-                    # Convert data to DataFrame for ensemble prediction
-                    import pandas as pd
-                    features_df = pd.DataFrame([data])
-                    ensemble_pred, ensemble_conf = self.ensemble_model.predict(features_df)
-                    ensemble_prediction = {
-                        'action': 'BUY' if ensemble_pred[0] > 0.5 else 'SELL' if ensemble_pred[0] < 0.3 else 'HOLD',
-                        'confidence': ensemble_conf[0],
-                        'probability': ensemble_pred[0]
-                    }
-                    self.logger.info(f"🎯 Ensemble prediction: {ensemble_prediction}")
+                    # Check if ensemble model is properly trained
+                    if not self.ensemble_model.models or not self.ensemble_model.meta_model:
+                        self.logger.warning("Ensemble model chưa được huấn luyện")
+                        ensemble_prediction = None
+                    else:
+                        # Convert data to DataFrame for ensemble prediction
+                        import pandas as pd
+                        features_df = pd.DataFrame([data])
+                        ensemble_pred, ensemble_conf = self.ensemble_model.predict(features_df)
+                        ensemble_prediction = {
+                            'action': 'BUY' if ensemble_pred[0] > 0.5 else 'SELL' if ensemble_pred[0] < 0.3 else 'HOLD',
+                            'confidence': ensemble_conf[0],
+                            'probability': ensemble_pred[0]
+                        }
+                        self.logger.info(f"🎯 Ensemble prediction: {ensemble_prediction}")
                 except Exception as e:
                     self.logger.warning(f"Ensemble model error: {e}")
+                    ensemble_prediction = None
             
             # LSTM Model prediction
             if self.lstm_model and hasattr(self.lstm_model, 'predict'):
                 try:
-                    lstm_pred, lstm_conf = self.lstm_model.predict(data)
-                    lstm_prediction = {
-                        'action': 'BUY' if lstm_pred > 0.6 else 'SELL' if lstm_pred < 0.4 else 'HOLD',
-                        'confidence': lstm_conf,
-                        'probability': lstm_pred
-                    }
-                    self.logger.info(f"🧠 LSTM prediction: {lstm_prediction}")
+                    # Check if LSTM model is trained
+                    if not self.lstm_model.is_trained:
+                        self.logger.warning("LSTM model chưa được huấn luyện")
+                        lstm_prediction = None
+                    else:
+                        lstm_pred, lstm_conf = self.lstm_model.predict(data)
+                        
+                        # Handle array inputs properly
+                        if isinstance(lstm_pred, np.ndarray):
+                            lstm_pred_val = lstm_pred[0] if len(lstm_pred) > 0 else 0.5
+                        else:
+                            lstm_pred_val = float(lstm_pred)
+                            
+                        if isinstance(lstm_conf, np.ndarray):
+                            lstm_conf_val = lstm_conf[0] if len(lstm_conf) > 0 else 0.5
+                        else:
+                            lstm_conf_val = float(lstm_conf)
+                        
+                        lstm_prediction = {
+                            'action': 'BUY' if lstm_pred_val > 0.6 else 'SELL' if lstm_pred_val < 0.4 else 'HOLD',
+                            'confidence': lstm_conf_val,
+                            'probability': lstm_pred_val
+                        }
+                        self.logger.info(f"🧠 LSTM prediction: {lstm_prediction}")
                 except Exception as e:
                     self.logger.warning(f"LSTM model error: {e}")
+                    lstm_prediction = None
             
             # RL Agent action
             if self.rl_agent and self.rl_agent.model:
@@ -3724,6 +3758,123 @@ class TradingBotController:
                 reasons = validation.get('reasons', [])
                 self.logger.warning(f"🚫 Trade rejected for {symbol}: {', '.join(reasons)}")
     
+    async def _initial_model_training(self):
+        """Perform initial training for AI models if they're not trained yet"""
+        
+        try:
+            if not self.running:
+                return
+                
+            self.logger.info("🎓 Checking AI model training status...")
+            
+            # Check if models need initial training
+            ensemble_trained = (self.ensemble_model and 
+                             hasattr(self.ensemble_model, 'models') and 
+                             self.ensemble_model.models and 
+                             hasattr(self.ensemble_model, 'meta_model') and 
+                             self.ensemble_model.meta_model)
+            
+            lstm_trained = (self.lstm_model and 
+                          hasattr(self.lstm_model, 'is_trained') and 
+                          self.lstm_model.is_trained)
+            
+            if ensemble_trained and lstm_trained:
+                self.logger.info("✅ AI models are already trained!")
+                return
+            
+            # Fetch historical data for initial training
+            self.logger.info("📊 Fetching historical data for initial training...")
+            historical_data = await self._fetch_initial_training_data()
+            
+            if not historical_data:
+                self.logger.warning("⚠️ No historical data available for initial training")
+                return
+            
+            # Train ensemble model if needed
+            if not ensemble_trained:
+                self.logger.info("🤖 Training ensemble model...")
+                try:
+                    for symbol, df in historical_data.items():
+                        if len(df) > 100:  # Need sufficient data
+                            # Prepare features and targets
+                            features_df = df.select_dtypes(include=[np.number]).dropna()
+                            if len(features_df) > 50:
+                                targets = self._create_training_targets(df)
+                                if targets is not None:
+                                    await self.master_agent.trigger_ai_training(symbol, df)
+                                    break  # Train on one symbol initially
+                except Exception as e:
+                    self.logger.warning(f"Ensemble model training failed: {e}")
+            
+            # Train LSTM model if needed
+            if not lstm_trained:
+                self.logger.info("🧠 Training LSTM model...")
+                try:
+                    for symbol, df in historical_data.items():
+                        if len(df) > 100:  # Need sufficient data for LSTM
+                            features_df = df.select_dtypes(include=[np.number]).dropna()
+                            if len(features_df) > 50:
+                                targets = self._create_training_targets(df)
+                                if targets is not None:
+                                    # Train LSTM model
+                                    training_result = self.lstm_model.train(features_df, targets)
+                                    if training_result.get('training_completed', False):
+                                        self.logger.info("✅ LSTM model trained successfully!")
+                                        break
+                except Exception as e:
+                    self.logger.warning(f"LSTM model training failed: {e}")
+            
+            self.logger.info("🎓 Initial model training completed!")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Initial model training failed: {e}")
+    
+    async def _fetch_initial_training_data(self) -> Dict[str, pd.DataFrame]:
+        """Fetch historical data for initial model training"""
+        
+        try:
+            historical_data = {}
+            
+            # Use up to 2 symbols for initial training
+            symbols = Config.SYMBOLS[:2]
+            
+            async with self.api_manager as api_mgr:
+                for symbol in symbols:
+                    try:
+                        # Fetch data for multiple timeframes
+                        df = await self.data_manager.get_fresh_data(symbol, 'H1')
+                        if df is not None and len(df) > 50:
+                            historical_data[symbol] = df
+                            self.logger.info(f"📈 Fetched {len(df)} historical records for {symbol}")
+                    except Exception as e:
+                        self.logger.warning(f"Could not fetch training data for {symbol}: {e}")
+                        continue
+            
+            return historical_data
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error fetching initial training data: {e}")
+            return {}
+    
+    def _create_training_targets(self, df: pd.DataFrame) -> Optional[pd.Series]:
+        """Create training targets from price data"""
+        
+        try:
+            if len(df) < 2:
+                return None
+                
+            # Simple target: 1 if next price is higher, 0 otherwise
+            targets = []
+            for i in range(len(df) - 1):
+                current_price = df['close'].iloc[i]
+                next_price = df['close'].iloc[i + 1]
+                targets.append(1 if next_price > current_price else 0)
+            
+            return pd.Series(targets, name='target')
+            
+        except Exception:
+            return None
+    
     async def _update_models_with_new_data(self, enriched_data: Dict[str, pd.DataFrame]):
         """Cập nhật models với dữ liệu mới"""
         
@@ -3815,6 +3966,9 @@ class TradingBotController:
         try:
             # Initialize all components
             await self.initialize()
+            
+            # Perform initial training if models are not trained
+            await self._initial_model_training()
             
             # Start real-time monitoring
             if self.real_time_monitor:
