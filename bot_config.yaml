@@ -1,0 +1,40 @@
+# Trading Bot Configuration
+# Modify these settings to optimize performance and API usage
+
+# API Rate Limiting (requests per minute)
+rate_limits:
+  oanda: 20          # Reduced from 100 to be conservative
+  finnhub: 60
+  newsapi: 1000
+  alpha_vantage: 5
+
+# Request delays (seconds between API calls)
+api_delays:
+  between_symbols: 1.0      # Wait between different symbols
+  between_timeframes: 0.5  # Wait between different timeframes
+  retry_delay: 2.0         # Base delay for retries
+
+# OANDA API Configuration  
+oanda:
+  # Symbol mappings - try these formats in order
+  symbol_mappings:
+    EURUSD: ["EUR_USD", "EURUSD"]
+    XAUUSD: ["XAU_USD", "XAUUSD", "GOLD"]
+    BTCUSD: ["BTC_USD", "BTCUSD", "BTC"]
+    NAS100: ["NAS100_USD", "NAS100", "NAS_USD"]
+  
+  # Alternative fallback APIs to try
+  fallback_apis:
+    - "yahoo_finance"
+    - "alpha_vantage" 
+    - "mock"
+
+# Debugging
+debug:
+  log_api_requests: true   # Log all API requests
+  mock_data_fallback: true # Use mock data when APIs fail
+  
+# Notifications
+notifications:
+  on_rate_limit: true     # Send notification when rate limited
+  on_api_error: true      # Send notification on API errors
