@@ -363,3 +363,21 @@ connector: <aiohttp.connector.TCPConnector object at 0x7fb9b2008980>
 2025-10-02 22:45:54,278 - MasterAgent - WARNING - LSTM model error: 'MockLSTMModel' object has no attribute 'is_trained'
 2025-10-02 22:45:54,278 - MasterAgent - WARNING - RL Agent error: 'bool' object has no attribute 'predict'
 2025-10-02 22:45:54,278 - MasterAgent - INFO - ✅ Master Agent quyết định: BUY BTCUSD với confidence 1.00 (AI-Enhanced)
+2025-10-02 23:01:12,354 - EnsembleModel - INFO - Đã xây dựng kiến trúc LSTM với Attention
+2025-10-02 23:01:35,693 - EnsembleModel - INFO - Đã xây dựng kiến trúc LSTM với Attention
+2025-10-02 23:01:35,694 - BotCore - INFO - 🚀 Initializing Trading Bot...
+2025-10-02 23:01:35,698 - BotCore - INFO - ✅ Database initialized at trading_bot.db
+2025-10-02 23:01:35,699 - BotCore - ERROR - ❌ Lỗi khởi tạo Trading Bot: No module named 'gym'
+2025-10-02 23:01:37,330 - Discord - INFO - Discord notification sent successfully
+2025-10-02 23:01:54,600 - EnsembleModel - INFO - Đã xây dựng kiến trúc LSTM với Attention
+2025-10-02 23:01:54,600 - BotCore - INFO - 🚀 Initializing Trading Bot...
+2025-10-02 23:01:54,601 - BotCore - INFO - ✅ Database initialized at trading_bot.db
+2025-10-02 23:01:54,603 - BotCore - ERROR - ❌ Lỗi khởi tạo Trading Bot: property 'logger' of 'TrainingCallback' object has no setter
+2025-10-02 23:01:54,841 - Discord - INFO - Discord notification sent successfully
+2025-10-02 23:02:22,580 - EnsembleModel - INFO - Đã xây dựng kiến trúc LSTM với Attention
+2025-10-02 23:02:22,580 - BotCore - INFO - 🚀 Initializing Trading Bot...
+2025-10-02 23:02:22,581 - BotCore - INFO - ✅ Database initialized at trading_bot.db
+2025-10-02 23:02:23,962 - RLAgent - INFO - Đã tạo PPO model
+2025-10-02 23:02:23,962 - BotCore - INFO - 🤖 RL Agent initialized successfully
+2025-10-02 23:02:23,962 - BotCore - INFO - ✅ Trading Bot initialized successfully
+2025-10-02 23:02:24,210 - Discord - INFO - Discord notification sent successfully

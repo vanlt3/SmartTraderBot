@@ -655,6 +655,77 @@ class EnhancedDataManager:
         
         # Fetch fresh data
         return await self.fetch_market_data(symbol, timeframe)
+    
+    def get_features(self, symbol: str, timeframe: str = 'H1') -> Optional[np.ndarray]:
+        """Extract features for RL Agent from cached data"""
+        try:
+            cache_key = f"{symbol}_{timeframe}"
+            
+            if cache_key not in self.data_cache:
+                self.logger.warning(f"No cached data available for {symbol} {timeframe}")
+                return None
+            
+            df = self.data_cache[cache_key]
+            
+            if df.empty or len(df) < 10:
+                self.logger.warning(f"Insufficient data for {symbol}: {len(df)} candles")
+                return None
+            
+            # Extract basic OHLC features
+            features = []
+            
+            # Recent OHLC data (relative to recent close)
+            recent_close = df['close'].iloc[-1]
+            
+            # Normalize OHLC features
+            features.extend([
+                df['open'].iloc[-1] / recent_close - 1.0,   # open_norm
+                df['high'].iloc[-1] / recent_close - 1.0,   # high_norm  
+                df['low'].iloc[-1] / recent_close - 1.0,    # low_norm
+                df['close'].iloc[-1] / recent_close - 1.0,  # close_norm (should be 0.0)
+            ])
+            
+            # Volume feature (if available)
+            if 'volume' in df.columns:
+                volume_norm = df['volume'].iloc[-1] / df['volume'].rolling(10).mean().iloc[-1]
+                features.append(volume_norm - 1.0)
+            else:
+                features.append(0.0)  # Default volume feature
+            
+            # Price momentum features
+            for window in [5, 10]:
+                if len(df) >= window:
+                    momentum = (df['close'].iloc[-1] / df['close'].iloc[-window] - 1.0)
+                    features.append(momentum)
+                else:
+                    features.append(0.0)
+            
+            # Volatility features
+            if len(df) >= 10:
+                returns = df['close'].pct_change().dropna()
+                volatility = returns.tail(10).std()
+                features.append(volatility)
+            else:
+                features.append(0.0)
+            
+            # High-Low spread feature
+            price_spread = (df['high'].iloc[-1] - df['low'].iloc[-1]) / recent_close
+            features.append(price_spread)
+            
+            # Convert to numpy array and clip extreme values
+            feature_array = np.array(features, dtype=np.float32)
+            feature_array = np.clip(feature_array, -1.0, 1.0)  # Clip to [-1, 1] range
+            
+            self.logger.debug(f"Extracted {len(feature_array)} features for {symbol}")
+            return feature_array
+            
+        except Exception as e:
+            self.logger.error(f"Error extracting features for {symbol}: {e}")
+            return self._get_default_features()
+    
+    def _get_default_features(self) -> np.ndarray:
+        """Return default feature array when extraction fails"""
+        return np.array([0.0] * 10, dtype=np.float32)
 
 # ===== ENGINEERING ĐẶC TRƯNG NÂNG CAO =====
 class AdvancedFeatureEngineer:
@@ -1740,7 +1811,7 @@ class TrainingCallback(BaseCallback):
     def __init__(self, check_freq: int = 10000, verbose: int = 1):
         super(TrainingCallback, self).__init__(verbose)
         self.check_freq = check_freq
-        self.logger = LOG_MANAGER.get_logger('RLAgent')
+        self._logger = LOG_MANAGER.get_logger('RLAgent')
     
     def _on_step(self) -> bool:
         """Called for each step"""
@@ -1748,7 +1819,7 @@ class TrainingCallback(BaseCallback):
         if self.n_calls % self.check_freq == 0:
             # Log training progress
             if hasattr(self.model, 'logger'):
-                self.logger.info(f"RL Training step {self.n_calls}")
+                self._logger.info(f"RL Training step {self.n_calls}")
         
         # Early stopping check
         if hasattr(self.training_env, 'get_attr'):
@@ -1758,7 +1829,7 @@ class TrainingCallback(BaseCallback):
                 
                 # Stop if portfolio drops below 70% of starting value
                 if current_value < 70000:
-                    self.logger.warning("Portfolio value quá thấp, dừng training")
+                    self._logger.warning("Portfolio value quá thấp, dừng training")
                     return False
         
         return True
@@ -3560,7 +3631,7 @@ class TradingBotController:
             self.auto_retrain_manager = AutoRetrainManager(self.ensemble_model, self.lstm_model)
             
             # Initialize RL Agent
-            import gym
+            import gymnasium as gym
             from stable_baselines3 import PPO
             
             # Create simplified trading environment for RL
@@ -3568,19 +3639,59 @@ class TradingBotController:
                 def __init__(self, data_manager):
                     super().__init__()
                     self.data_manager = data_manager
-                    self.action_space = gym.spaces.Discrete(3)  # BUY, SELL, HOLD
-                    self.observation_space = gym.spaces.Box(low=0, high=1, shape=(10,), dtype=np.float32)
+                    self.action_space = gym.spaces.Discrete(3)  # BUY, SELL, HOLD (0=BV, 1=SELL, 2=HOLD)
+                    self.observation_space = gym.spaces.Box(low=-1, high=1, shape=(10,), dtype=np.float32)
+                    self.current_step = 0
+                    self.current_symbol = Config.SYMBOLS[0] if Config.SYMBOLS else "EURUSD"
                     
                 def step(self, action):
-                    # Simplified step implementation
-                    obs = np.random.rand(10)
-                    reward = np.random.uniform(-1, 1)
+                    # Get real features from data manager
+                    obs = self.data_manager.get_features(self.current_symbol, 'H1')
+                    
+                    if obs is None:
+                        # Fallback if no features available
+                        obs = np.array([0.0] * 10, dtype=np.float32)
+                    else:
+                        # Ensure we have exactly 10 features
+                        if len(obs) != 10:
+                            obs = np.pad(obs, (0, 10 - len(obs)), 'constant')[:10]
+                    
+                    # Simplified reward calculation based on action
+                    reward = self._calculate_reward(action)
+                    
+                    self.current_step += 1
                     done = False
-                    info = {}
+                    info = {
+                        'symbol': self.current_symbol,
+                        'action': action,
+                        'step': self.current_step
+                    }
+                    
                     return obs, reward, done, info
                 
                 def reset(self):
-                    return np.random.rand(10)
+                    self.current_step = 0
+                    # Try to get features for the current symbol
+                    obs = self.data_manager.get_features(self.current_symbol, 'H1')
+                    
+                    if obs is None:
+                        # Fallback if no features available
+                        obs = np.array([0.0] * 10, dtype=np.float32)
+                    else:
+                        # Ensure we have exactly 10 features
+                        if len(obs) != 10:
+                            obs = np.pad(obs, (0, 10 - len(obs)), 'constant')[:10]
+                    
+                    return obs
+                
+                def _calculate_reward(self, action: int) -> float:
+                    """Calculate reward based on action taken"""
+                    # For now, return a small random reward
+                    # In a real implementation, this would calculate based on actual trading performance
+                    import random
+                    reward_ranges = {0: (-0.1, 0.5), 1: (-0.1, 0.5), 2: (-0.05, 0.05)}  # BUY, SELL, HOLD
+                    min_reward, max_reward = reward_ranges[action]
+                    return random.uniform(min_reward, max_reward)
             
             if hasattr(self.data_manager, 'get_features'):
                 trading_env = SimpleTradingEnv(self.data_manager)
