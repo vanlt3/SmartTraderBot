@@ -2204,6 +2204,157 @@ class DiscordNotificationManager:
         # Rate limiting
         await asyncio.sleep(self.rate_limit_delay)
 
+class AdvancedRiskManager:
+    """Advanced Risk Management System"""
+    
+    def __init__(self, api_manager):
+        self.api_manager = api_manager
+        self.logger = LOG_MANAGER.get_logger('RiskManager')
+        
+        # Portfolio settings
+        self.max_total_exposure = 1.0  # 100% of portfolio
+        self.max_position_size = 0.1   # 10% per position
+        self.stop_loss_pct = 0.02      # 2% stop loss
+        self.take_profit_ratio = 2.0   # 2:1 risk/reward
+        
+        # Position tracking
+        self.open_positions = {}
+        self.portfolio_value = 10000   # Starting portfolio value
+        self.cash_balance = 10000      # Available cash
+        
+    def calculate_position_size(self, symbol: str, signal_strength: float, confidence: float, entry_price: float) -> Dict[str, Any]:
+        """Calculate optimal position size based on risk parameters"""
+        
+        # Base position size calculation
+        base_size = self.cash_balance * self.max_position_size
+        
+        # Adjust based on signal strength and confidence
+        adjustment_factor = min(signal_strength * confidence, 1.0)
+        position_size = base_size * adjustment_factor
+        
+        # Calculate stop loss and take profit
+        stop_loss = entry_price * (1 - self.stop_loss_pct)
+        take_profit = entry_price + (entry_price - stop_loss) * self.take_profit_ratio
+        
+        # Calculate risk percentage
+        risk_amount = abs(position_size * (entry_price - stop_loss) / entry_price)
+        risk_percentage = (risk_amount / self.portfolio_value) * 100
+        
+        return {
+            'size': position_size,
+            'entry_price': entry_price,
+            'stop_loss': stop_loss,
+            'take_profit': take_profit,
+            'risk_percentage': risk_percentage,
+            'risk_amount': risk_amount
+        }
+    
+    def validate_trade(self, symbol: str, position_data: Dict[str, Any]) -> bool:
+        """Validate if trade meets risk criteria"""
+        
+        # Check if we already have a position in this symbol
+        if symbol in self.open_positions:
+            self.logger.warning(f"Already have position in {symbol}")
+            return False
+            
+        # Check portfolio exposure
+        current_exposure = self._calculate_portfolio_exposure()
+        new_exposure = position_data.get('risk_amount', 0)
+        
+        if current_exposure + new_exposure > self.max_total_exposure * self.portfolio_value:
+            self.logger.warning(f"Trade rejected: Portfolio exposure too high ({current_exposure + new_exposure:.2f})")
+            return False
+            
+        # Check available cash
+        if position_data.get('size', 0) > self.cash_balance:
+            self.logger.warning(f"Trade rejected: Insufficient cash ({self.cash_balance:.2f})")
+            return False
+            
+        return True
+    
+    def update_position(self, symbol: str, position_data: Dict[str, Any]):
+        """Update position tracking"""
+        
+        position_data.update({
+            'status': 'open',
+            'timestamp': datetime.now(),
+            'symbol': symbol
+        })
+        
+        self.open_positions[symbol] = position_data
+        
+        # Update cash balance
+        self.cash_balance -= position_data.get('size', 0)
+        
+        self.logger.info(f"Position updated for {symbol}: {position_data}")
+    
+    def close_position(self, symbol: str, exit_price: float):
+        """Close position and update portfolio"""
+        
+        if symbol not in self.open_positions:
+            self.logger.warning(f"No position found for {symbol}")
+            return None
+            
+        position = self.open_positions[symbol]
+        
+        # Calculate P&L
+        entry_price = position.get('entry_price', exit_price)
+        position_size = position.get('size', 0)
+        
+        pnl = position_size * (exit_price - entry_price) / entry_price
+        
+        # Update portfolio
+        self.portfolio_value += pnl
+        self.cash_balance += position_size + pnl
+        
+        # Remove from open positions
+        closed_position = self.open_positions.pop(symbol)
+        closed_position.update({
+            'status': 'closed',
+            'exit_price': exit_price,
+            'pnl': pnl,
+            'close_timestamp': datetime.now()
+        })
+        
+        self.logger.info(f"Position closed for {symbol}: P&L = {pnl:.2f}")
+        return closed_position
+    
+    def calculate_portfolio_metrics(self) -> Dict[str, Any]:
+        """Calculate current portfolio metrics"""
+        
+        total_open_pnl = 0
+        for symbol, position in self.open_positions.items():
+            if position.get('status') == 'open':
+                # Simple current P&L calculation (would need current price in real implementation)
+                entry_price = position.get('entry_price', 0)
+                pnl = (1 - entry_price) * position.get('position_size', 0)  # Simplified
+                total_open_pnl += pnl
+        
+        return {
+            'total_value': self.portfolio_value + total_open_pnl,
+            'cash_balance': self.cash_balance,
+            'open_positions': len(self.open_positions),
+            'total_exposure': self._calculate_portfolio_exposure(),
+            'unrealized_pnl': total_open_pnl
+        }
+    
+    def _calculate_portfolio_exposure(self) -> float:
+        """Calculate current portfolio exposure"""
+        
+        total_exposure = 0
+        for position in self.open_positions.values():
+            if position.get('status') == 'open':
+                total_exposure += position.get('size', 0)
+        
+        return total_exposure / self.portfolio_value if self.portfolio_value > 0 else 0
+    
+    def get_position_status(self, symbol: str) -> Dict[str, Any]:
+        """Get current status of a position"""
+        
+        if symbol in self.open_positions:
+            return self.open_positions[symbol]
+        return None
+
 class RealTimeMonitor:
     """Giám sát real-time các positions và tự động đóng SL/TP"""
     
