@@ -316,6 +316,11 @@ class APIManager:
                           params: Dict = None, api_name: str = 'generic') -> Optional[Dict]:
         """Thực hiện HTTP request với retry logic"""
         
+        # Kiểm tra session và tự động khởi tạo lại nếu cần
+        if not self.session or self.session.closed:
+            self.logger.warning(f"Session is closed cho {api_name}, đang khởi tạo lại...")
+            await self.__aenter__()
+        
         # Kiểm tra rate limit
         if not self._check_rate_limit(api_name):
             self.logger.warning(f"Rate limit cho {api_name}, chờ thêm thời gian...")
@@ -344,6 +349,15 @@ class APIManager:
             
             except asyncio.TimeoutError:
                 self.logger.warning(f"Timeout cho {api_name}, attempt {attempt + 1}")
+            except aiohttp.ClientError as e:
+                if "Session is closed" in str(e):
+                    self.logger.warning(f"Session closed cho {api_name}, attempt {attempt + 1}")
+                    # Recreate session for next attempt
+                    if self.session:
+                        await self.session.close()
+                    await self.__aenter__()
+                else:
+                    self.logger.error(f"Client error cho {api_name}: {e}")
             except Exception as e:
                 self.logger.error(f"Lỗi API call {api_name}: {e}")
         
@@ -426,16 +440,18 @@ class EnhancedDataManager:
         # Map timeframe to OANDA format
         tf_mapping = {"M15": "M15", "H1": "H1", "H4": "H4", "D1": "D"}
         params = {
-            'count': count,
+            'count': min(count, 5000),  # OANDA limit
             'granularity': tf_mapping[timeframe],
-            'price': 'MBA'  # Mid, Bid, Ask
+            'price': 'M'  # Mid only - đơn giản hóa
         }
         
         headers = {
             'Authorization': f'Bearer {Config.OANDA_API_KEY}',
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Accept-Datetime-Format': 'RFC3339'  # OANDA recommended header
         }
         
+        self.logger.info(f"Fetching {symbol} ({oanda_symbol}) {timeframe} data from OANDA...")
         data = await self.api_manager._make_request(url, headers=headers, params=params, api_name='oanda')
         
         if data and 'candles' in data:
@@ -2209,6 +2225,20 @@ class OnlineLearningManager:
             for symbol in Config.SYMBOLS
         }
     
+    def _numpy_to_dict(self, features: np.ndarray) -> Dict[str, float]:
+        """Convert numpy array to dict format for River framework"""
+        if len(features.shape) == 1:
+            # 1D array -> dict with numeric keys
+            return {f"feature_{i}": float(features[i]) for i in range(len(features))}
+        elif len(features.shape) == 2 and features.shape[0] == 1:
+            # 2D array with 1 row -> flatten to 1D
+            flattened = features.flatten()
+            return {f"feature_{i}": float(flattened[i]) for i in range(len(flattened))}
+        else:
+            # Complex array -> flatten and truncate
+            flattened = features.flatten()[:50]  # Limit to 50 features
+            return {f"feature_{i}": float(flattened[i]) for i in range(len(flattened))}
+    
     def update_model(self, symbol: str, features: np.ndarray, target: float):
         """Cập nhật online model với data mới"""
         
@@ -2218,8 +2248,11 @@ class OnlineLearningManager:
             
             model_info = self.online_models[symbol]
             
+            # Convert numpy array to dict for River framework
+            features_dict = self._numpy_to_dict(features)
+            
             # Preprocess features
-            scaled_features = model_info['preprocessor'].learn_one(features).transform_one(features)
+            scaled_features = model_info['preprocessor'].learn_one(features_dict).transform_one(features_dict)
             
             # Update anomaly detector
             model_info['anomaly_detector'].learn_one(scaled_features)
@@ -2251,7 +2284,10 @@ class OnlineLearningManager:
                 return 0.0, 0.0
             
             model_info = self.online_models[symbol]
-            scaled_features = model_info['preprocessor'].transform_one(features)
+            
+            # Convert numpy array to dict for River framework
+            features_dict = self._numpy_to_dict(features)
+            scaled_features = model_info['preprocessor'].transform_one(features_dict)
             
             prediction = model_info['linear_model'].predict_one(scaled_features)
             confidence = 1.0 - np.mean(model_info['performance_history'][-10:]) if model_info['performance_history'] else 0.5
