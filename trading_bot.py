@@ -1998,74 +1998,146 @@ class NewsSpecialistAgent:
         }
 
 class MasterAgent:
-    """Master Agent điều phối tất cả specialist agents"""
+    """Master Agent điều phối tất cả specialist agents và AI models"""
     
-    def __init__(self, trend_agent, news_agent, risk_agent):
+    def __init__(self, trend_agent, news_agent, risk_agent, ensemble_model=None, lstm_model=None, rl_agent=None):
         self.logger = LOG_MANAGER.get_logger('MasterAgent')
         self.trend_agent = trend_agent
         self.news_agent = news_agent
         self.risk_agent = risk_agent
+        self.ensemble_model = ensemble_model
+        self.lstm_model = lstm_model
+        self.rl_agent = rl_agent
         self.decisions = {}
+        self.ensemble_weight = 0.4
+        self.lstm_weight = 0.3
+        self.expert_weight = 0.3
+        self.cycle_count = 0
         
     async def make_decision(self, symbol: str, data: dict, portfolio_value: float) -> dict:
-        """Đưa ra quyết định trading cuối cùng"""
+        """Đưa ra quyết định trading cuối cùng sử dụng Ensemble AI và Expert Systems"""
         try:
-            self.logger.info(f"🤖 Master Agent đang phân tích {symbol}...")
+            self.logger.info(f"🤖 Master Agent đang phân tích {symbol} với AI models...")
             
-            # Collect insights từ tất cả specialist agents
+            # 1. Collect insights từ expert specialist agents
             trend_insight = await self.trend_agent.analyze_trend(symbol, data)
             sentiment_insight = await self.news_agent.analyze_sentiment(symbol)
             risk_assessment = await self.risk_agent.assess_risk(symbol, data, portfolio_value)
             
-            # Voting mechanism cho decision
-            votes = {
-                'BUY': 0,
-                'SELL': 0,
-                'HOLD': 0
-            }
+            # 2. Get AI Model predictions
+            ensemble_prediction = None
+            lstm_prediction = None
+            rl_action = None
             
-            # Trend vote
+            # Ensemble Model prediction
+            if self.ensemble_model and hasattr(self.ensemble_model, 'predict'):
+                try:
+                    # Convert data to DataFrame for ensemble prediction
+                    import pandas as pd
+                    features_df = pd.DataFrame([data])
+                    ensemble_pred, ensemble_conf = self.ensemble_model.predict(features_df)
+                    ensemble_prediction = {
+                        'action': 'BUY' if ensemble_pred[0] > 0.5 else 'SELL' if ensemble_pred[0] < 0.3 else 'HOLD',
+                        'confidence': ensemble_conf[0],
+                        'probability': ensemble_pred[0]
+                    }
+                    self.logger.info(f"🎯 Ensemble prediction: {ensemble_prediction}")
+                except Exception as e:
+                    self.logger.warning(f"Ensemble model error: {e}")
+            
+            # LSTM Model prediction
+            if self.lstm_model and hasattr(self.lstm_model, 'predict'):
+                try:
+                    lstm_pred, lstm_conf = self.lstm_model.predict(data)
+                    lstm_prediction = {
+                        'action': 'BUY' if lstm_pred > 0.6 else 'SELL' if lstm_pred < 0.4 else 'HOLD',
+                        'confidence': lstm_conf,
+                        'probability': lstm_pred
+                    }
+                    self.logger.info(f"🧠 LSTM prediction: {lstm_prediction}")
+                except Exception as e:
+                    self.logger.warning(f"LSTM model error: {e}")
+            
+            # RL Agent action
+            if self.rl_agent and self.rl_agent.model:
+                try:
+                    env_state = [portfolio_value, data.get('close', 0), risk_assessment['risk_level'] == 'HIGH']
+                    action, _ = self.rl_agent.model.predict(env_state, deterministic=True)
+                    rl_action = {
+                        'action': 'BUY' if action == 0 else 'SELL' if action == 1 else 'HOLD',
+                        'confidence': 0.7,  # Default RL confidence
+                        'action_id': action
+                    }
+                    self.logger.info(f"🤖 RL Agent action: {rl_action}")
+                except Exception as e:
+                    self.logger.warning(f"RL Agent error: {e}")
+            
+            # 3. Weighted Ensemble Decision Making
+            expert_votes = {'BUY': 0, 'SELL': 0, 'HOLD': 0}
+            
+            # Expert system votes
             trend_recommendation = self.trend_agent.get_trend_recommendation(symbol)
-            votes[trend_recommendation['action']] += trend_recommendation['confidence']
+            expert_votes[trend_recommendation['action']] += trend_recommendation['confidence'] * self.expert_weight
             
-            # Sentiment vote
             sentiment_recommendation = self.news_agent.get_sentiment_recommendation(symbol)
             if sentiment_recommendation['sentiment'] == 'POSITIVE':
-                votes['BUY'] += sentiment_recommendation['confidence']
+                expert_votes['BUY'] += sentiment_recommendation['confidence'] * self.expert_weight
             elif sentiment_recommendation['sentiment'] == 'NEGATIVE':
-                votes['SELL'] += sentiment_recommendation['confidence']
+                expert_votes['SELL'] += sentiment_recommendation['confidence'] * self.expert_weight
             else:
-                votes['HOLD'] += sentiment_recommendation['confidence']
+                expert_votes['HOLD'] += sentiment_recommendation['confidence'] * self.expert_weight
             
-            # Risk assessment giới hạn position size
+            # Combine AI predictions with expert systems
+            if ensemble_prediction:
+                expert_votes[ensemble_prediction['action']] += ensemble_prediction['confidence'] * self.ensemble_weight
+            if lstm_prediction:
+                expert_votes[lstm_prediction['action']] += lstm_prediction['confidence'] * self.lstm_weight
+            if rl_action:
+                expert_votes[rl_action['action']] += rl_action['confidence'] * 0.3  # RL weight
+            
+            # 4. Final weighted decision
+            best_action = max(expert_votes, key=expert_votes.get)
+            confidence = expert_votes[best_action] / max(sum(expert_votes.values()), 0.1)
+            
+            # Risk-based override
             max_position_size = risk_assessment['position_size']
-            
-            # Final decision
-            best_action = max(votes, key=votes.get)
-            confidence = votes[best_action] / max(1, sum(votes.values()))
-            
-            # Override với risk-based limits
             if risk_assessment['risk_level'] == 'HIGH' and best_action != 'HOLD':
                 best_action = 'HOLD'
-                confidence *= 0.5  # Reduce confidence
+                confidence *= 0.5
+                self.logger.info(f"⚠️ Risk override: HIGH risk forces HOLD")
+            
+            # Calculate ensemble confidence boost
+            if ensemble_prediction and lstm_prediction:
+                ai_consensus = abs(ensemble_prediction['probability'] - 0.5) + abs(lstm_prediction['probability'] - 0.5)
+                confidence = min(confidence + ai_consensus * 0.2, 1.0)
             
             decision = {
                 'action': best_action,
-                'confidence': confidence,
-                'position_size': min(max_position_size, 0.02),  # Cap at 2%
+                'confidence': min(confidence, 1.0),
+                'position_size': min(max_position_size, 0.02),
+                'ai_predictions': {
+                    'ensemble': ensemble_prediction,
+                    'lstm': lstm_prediction,
+                    'rl': rl_action
+                },
                 'reasoning': {
                     'trend': trend_recommendation,
                     'sentiment': sentiment_recommendation,
                     'risk': {
                         'level': risk_assessment['risk_level'],
                         'max_size': risk_assessment['position_size']
+                    },
+                    'weights': {
+                        'ensemble': self.ensemble_weight,
+                        'lstm': self.lstm_weight,
+                        'expert': self.expert_weight
                     }
                 },
                 'timestamp': datetime.now().isoformat()
             }
             
             self.decisions[symbol] = decision
-            self.logger.info(f"✅ Master Agent quyết định: {best_action} {symbol} với confidence {confidence:.2f}")
+            self.logger.info(f"✅ Master Agent quyết định: {best_action} {symbol} với confidence {confidence:.2f} (AI-Enhanced)")
             
             return decision
             
@@ -2094,6 +2166,9 @@ class MasterAgent:
             symbols_with_data = list(enriched_data.keys())
             self.logger.info(f"📊 Symbols có dữ liệu để phân tích: {', '.join(symbols_with_data)}")
             
+            # Increment cycle count for training triggers
+            self.cycle_count += 1
+            
             decisions = {}
             buy_signals = []
             sell_signals = []
@@ -2105,6 +2180,12 @@ class MasterAgent:
                     
                 # Get latest row for decision making
                 latest_data = features_data.iloc[-1].to_dict()
+                
+                # Trigger AI training if we have enough data (every 500 cycles hoặc khi performance thấp)
+                if len(features_data) >= 50 and self.cycle_count % 500 == 0:
+                    self.logger.info(f"🔄 Triggering AI training cho {symbol}...")
+                    training_result = await self.trigger_ai_training(symbol, features_data)
+                    self.logger.info(f"🎓 Training result: {training_result.get('status', 'unknown')}")
                 
                 # Make individual decision for this symbol
                 individual_decision = await self.make_decision(symbol, latest_data, portfolio_status.get('total_value', 100000))
@@ -2169,6 +2250,75 @@ class MasterAgent:
                 'timestamp': datetime.now().isoformat(),
                 'error': str(e)
             }
+    
+    async def trigger_ai_training(self, symbol: str, recent_data: pd.DataFrame) -> dict:
+        """Trigger AI model training khi có đủ dữ liệu"""
+        try:
+            if recent_data.empty or len(recent_data) < 50:
+                return {'status': 'insufficient_data', 'data_points': len(recent_data)}
+            
+            self.logger.info(f"🎓 Training AI models cho {symbol} với {len(recent_data)} data points...")
+            
+            # Prepare features và labels cho training
+            features = recent_data.drop(['close'], axis=1, errors='ignore')
+            labels = (recent_data['close'].shift(-1) > recent_data['close']).astype(int)[:-1]
+            features = features.iloc[:-1]  # Remove last row để match labels
+            
+            training_results = {}
+            
+            # Train Ensemble Model
+            if self.ensemble_model and hasattr(self.ensemble_model, 'train_ensemble'):
+                try:
+                    ensemble_scores = self.ensemble_model.train_ensemble(features, labels)
+                    training_results['ensemble'] = ensemble_scores
+                    self.logger.info(f"✅ Ensemble training completed - Accuracy: {ensemble_scores.get('accuracy', 0):.3f}")
+                except Exception as e:
+                    self.logger.error(f"Ensemble training failed: {e}")
+                    training_results['ensemble'] = {'error': str(e)}
+            
+            # Train LSTM Model
+            if self.lstm_model and hasattr(self.lstm_model, 'train'):
+                try:
+                    lstm_scores = self.lstm_model.train(features, labels)
+                    training_results['lstm'] = lstm_scores
+                    self.logger.info(f"✅ LSTM training completed - Validation Accuracy: {lstm_scores.get('val_accuracy', 0):.3f}")
+                except Exception as e:
+                    self.logger.error(f"LSTM training failed: {e}")
+                    training_results['lstm'] = {'error': str(e)}
+            
+            # Train RL Agent
+            if self.rl_agent and self.rl_agent.model:
+                try:
+                    self.rl_agent.train(total_timesteps=10000)
+                    training_results['rl'] = {'status': 'trained', 'timesteps': 10000}
+                    self.logger.info("✅ RL Agent training completed")
+                except Exception as e:
+                    self.logger.error(f"RL training failed: {e}")
+                    training_results['rl'] = {'error': str(e)}
+            
+            # Cập nhật model weights nếu training thành công
+            trained_models = [k for k, v in training_results.items() if 'error' not in str(v)]
+            if len(trained_models) >= 2:
+                # Boost confidence weight của các models trained
+                self.ensemble_weight = 0.5
+                self.lstm_weight = 0.4
+                self.expert_weight = 0.1
+                self.logger.info(f"🎯 Model weights updated after training: {trained_models}")
+            
+            return {
+                'status': 'training_completed',
+                'trained_models': trained_models,
+                'results': training_results,
+                'updated_weights': {
+                    'ensemble': self.ensemble_weight,
+                    'lstm': self.lstm_weight,
+                    'expert': self.expert_weight
+                }
+            }
+            
+        except Exception as e:
+            self.logger.error(f"AI training failed: {e}")
+            return {'status': 'error', 'message': str(e)}
 
 class RLAgent:
     """RL Agent sử dụng PPO từ stable-baselines3"""
@@ -3342,8 +3492,15 @@ class TradingBotController:
             # Initialize specialist agents
             self.news_agent = NewsSpecialistAgent(self.news_manager)
             
-            # Initialize Master Agent
-            self.master_agent = MasterAgent(self.trend_agent, self.news_agent, self.risk_agent)
+            # Initialize Master Agent với AI models
+            self.master_agent = MasterAgent(
+                self.trend_agent, 
+                self.news_agent, 
+                self.risk_agent,
+                ensemble_model=self.ensemble_model,
+                lstm_model=self.lstm_model,
+                rl_agent=self.rl_agent
+            )
             
             # Initialize Risk Manager
             self.risk_manager = AdvancedRiskManager(self.api_manager)
@@ -3351,8 +3508,37 @@ class TradingBotController:
             # Initialize Auto Retrain Manager
             self.auto_retrain_manager = AutoRetrainManager(self.ensemble_model, self.lstm_model)
             
-            # Initialize RL Agent (simplified environment)
-            # self.rl_agent = RLAgent(PortfolioEnvironment(self.data_manager, self.feature_engineer))
+            # Initialize RL Agent
+            import gym
+            from stable_baselines3 import PPO
+            
+            # Create simplified trading environment for RL
+            class SimpleTradingEnv(gym.Env):
+                def __init__(self, data_manager):
+                    super().__init__()
+                    self.data_manager = data_manager
+                    self.action_space = gym.spaces.Discrete(3)  # BUY, SELL, HOLD
+                    self.observation_space = gym.spaces.Box(low=0, high=1, shape=(10,), dtype=np.float32)
+                    
+                def step(self, action):
+                    # Simplified step implementation
+                    obs = np.random.rand(10)
+                    reward = np.random.uniform(-1, 1)
+                    done = False
+                    info = {}
+                    return obs, reward, done, info
+                
+                def reset(self):
+                    return np.random.rand(10)
+            
+            if hasattr(self.data_manager, 'get_features'):
+                trading_env = SimpleTradingEnv(self.data_manager)
+                self.rl_agent = RLAgent(trading_env)
+                self.rl_agent.create_model()
+                self.logger.info("🤖 RL Agent initialized successfully")
+            else:
+                self.rl_agent = None
+                self.logger.warning("RL Agent skipped - data_manager missing features")
             
             # Initialize Real-time Monitor
             self.real_time_monitor = RealTimeMonitor(self.risk_manager)
