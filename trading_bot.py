@@ -2772,6 +2772,48 @@ class AdvancedRiskManager:
         # Update cash balance
         self.cash_balance -= position_data.get('size', 0)
         
+        # Insert into database
+        try:
+            import sqlite3
+            
+            conn = sqlite3.connect(Config.DB_PATH)
+            cursor = conn.cursor()
+            
+            # Determine position type from the data
+            position_type = 'buy' if position_data.get('position_type', 'buy') == 'buy' else 'sell'
+            
+            # Insert new position record
+            cursor.execute("""
+                INSERT INTO positions (
+                    symbol, status, position_type, size, entry_price, 
+                    stop_loss, take_profit, entry_time, risk_percentage
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                symbol,
+                'open',
+                position_type,
+                position_data.get('size', 0),
+                position_data.get('entry_price', 0),
+                position_data.get('stop_loss'),
+                position_data.get('take_profit'),
+                datetime.now().isoformat(),
+                position_data.get('risk_percentage', 0)
+            ))
+            
+            # Get the ID of the newly created record
+            position_id = cursor.lastrowid
+            
+            # Store the position ID in the position data for future reference
+            position_data['db_id'] = position_id
+            
+            conn.commit()
+            conn.close()
+            
+            self.logger.info(f"✅ Position entered into database with ID {position_id} for {symbol}")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to insert position into database for {symbol}: {e}")
+        
         self.logger.info(f"Position updated for {symbol}: {position_data}")
     
     def close_position(self, symbol: str, exit_price: float):
@@ -2971,15 +3013,48 @@ class RealTimeMonitor:
             position['pnl'] = pnl
             position['exit_time'] = datetime.now()
             
+            # Calculate exit price from P&L
+            entry_price = position.get('entry_price', 0)
+            position_size = position.get('size', 0)
+            exit_price = None
+            
+            if position_size != 0 and entry_price != 0:
+                # exit_price = entry_price + (pnl / position_size)
+                exit_price = entry_price + (pnl / abs(position_size)) * (1 if position_size > 0 else -1)
+                position['exit_price'] = exit_price
+            
             # Save to database
+            import sqlite3
+            
             conn = sqlite3.connect(Config.DB_PATH)
             cursor = conn.cursor()
             
-            cursor.execute("""
-                UPDATE positions 
-                SET status='closed', exit_time=?, pnl=? 
-                WHERE symbol=? AND status='open'
-            """, (datetime.now().isoformat(), pnl, symbol))
+            # Use database ID if available, otherwise fallback to symbol lookup
+            position_id = position.get('db_id')
+            
+            if position_id:
+                cursor.execute("""
+                    UPDATE positions 
+                    SET status='closed', exit_time=?, pnl=?, exit_price=? 
+                    WHERE id=?
+                """, (datetime.now().isoformat(), pnl, exit_price, position_id))
+                
+                self.logger.info(f"✅ Position updated in database using ID {position_id}")
+            else:
+                # Fallback to symbol-based update for backward compatibility
+                cursor.execute("""
+                    UPDATE positions 
+                    SET status='closed', exit_time=?, pnl=?, exit_price=? 
+                    WHERE symbol=? AND status='open'
+                """, (datetime.now().isoformat(), pnl, exit_price, symbol))
+                
+                # Get the ID of the updated record for future reference
+                cursor.execute("SELECT id FROM positions WHERE symbol=? AND status='closed' ORDER BY id DESC LIMIT 1", (symbol,))
+                result = cursor.fetchone()
+                if result:
+                    position['db_id'] = result[0]
+                
+                self.logger.info(f"✅ Position updated in database using symbol {symbol}")
             
             conn.commit()
             conn.close()
@@ -3037,11 +3112,52 @@ class TradingBotController:
         self.last_data_fetch = None
         self.trading_session_start = None
     
+    def setup_database(self):
+        """Khởi tạo SQLite database và tạo bảng positions nếu chưa tồn tại"""
+        
+        try:
+            import sqlite3
+            from datetime import datetime
+            
+            conn = sqlite3.connect(Config.DB_PATH)
+            cursor = conn.cursor()
+            
+            # Tạo bảng positions với cấu trúc hoàn chỉnh
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS positions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    symbol TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    position_type TEXT NOT NULL,
+                    size REAL NOT NULL,
+                    entry_price REAL NOT NULL,
+                    exit_price REAL,
+                    stop_loss REAL,
+                    take_profit REAL,
+                    entry_time TEXT NOT NULL,
+                    exit_time TEXT,
+                    pnl REAL,
+                    risk_percentage REAL
+                )
+            """)
+            
+            conn.commit()
+            conn.close()
+            
+            self.logger.info(f"✅ Database initialized at {Config.DB_PATH}")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Database initialization failed: {e}")
+            raise
+    
     async def initialize(self):
         """Khởi tạo tất cả components"""
         
         try:
             self.logger.info("🚀 Initializing Trading Bot...")
+            
+            # Setup database first
+            self.setup_database()
             
             # Initialize API Manager
             self.api_manager = APIManager()
