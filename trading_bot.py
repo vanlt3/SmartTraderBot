@@ -42,6 +42,18 @@ import optuna
 
 # Deep Learning
 import tensorflow as tf
+
+# Force CPU-only mode to avoid CUDA errors
+try:
+    # Hide GPU devices
+    tf.config.set_visible_devices([], 'GPU')
+    # Set CPU threading
+    tf.config.threading.set_inter_op_parallelism_threads(0)  # Use all CPU cores
+    tf.config.threading.set_intra_op_parallelism_threads(0)  # Use all CPU cores
+    print("⚠️  Running in CPU-only mode (No GPU available)")
+except Exception as e:
+    print(f"⚠️  TensorFlow configuration warning: {e}")
+
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import LSTM, Dense, Dropout, Attention, BatchNormalization, Input
 from tensorflow.keras.optimizers import Adam
@@ -65,10 +77,11 @@ from ta.momentum import RSIIndicator
 # Online Learning
 from river import linear_model, preprocessing, anomaly
 
-# Suppress warnings
+# Suppress warnings and CUDA errors
 warnings.filterwarnings('ignore')
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress all TensorFlow logs
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # Disable CUDA devices
+os.environ['TF_DISABLE_GPU'] = '1'  # Additional flag to disable GPU
 
 # Set UTF-8 encoding
 sys.stdout.reconfigure(encoding='utf-8')
