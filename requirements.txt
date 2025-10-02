@@ -1,0 +1,40 @@
+# Bot Giao dịch AI/ML Requirements
+# ===============================
+
+# Core Dependencies
+asyncio
+aiohttp>=3.8.0
+pandas>=1.5.0
+numpy>=1.21.0
+requests>=2.28.0
+
+# Database
+sqlite3
+
+# Machine Learning Core
+scikit-learn>=1.1.0
+xgboost>=1.6.0
+lightgbm>=3.3.0
+
+# Hyperparameter Optimization
+optuna>=3.0.0
+
+# Deep Learning
+tensorflow>=2.10.0
+
+# Reinforcement Learning
+gym>=0.21.0
+stable-baselines3>=1.6.0
+
+# Technical Analysis
+ta>=0.10.0
+
+# Online Learning
+river>=0.14.0
+
+# Webhooks for Discord (built-in)
+# Discord webhook URL is already configured
+
+# System Libraries (built-in Python)
+# logging, warnings, os, sys, json, time
+# datetime, typing, dataclasses, enum, threading, queue
