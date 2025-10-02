@@ -1,0 +1,178 @@
+2025-10-02 16:26:07,033 - EnsembleModel - INFO - Đã xây dựng kiến trúc LSTM với Attention
+2025-10-02 16:26:07,033 - BotCore - INFO - 🚀 Starting Trading Bot (cycle interval: 60 minutes)
+2025-10-02 16:26:07,033 - BotCore - INFO - 🚀 Initializing Trading Bot...
+2025-10-02 16:26:07,033 - BotCore - INFO - ✅ Trading Bot initialized successfully
+2025-10-02 16:26:07,311 - Discord - INFO - Discord notification sent successfully
+2025-10-02 16:26:08,313 - RiskManager - INFO - Real-time monitoring started
+2025-10-02 16:26:08,313 - BotCore - INFO - 📈 Starting trading cycle #1
+2025-10-02 16:26:08,457 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:08,457 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:26:08,470 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:08,471 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:26:08,471 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:08,471 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:26:08,471 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:08,471 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:26:08,472 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:08,472 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:26:08,475 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:08,475 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:26:08,482 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:08,482 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:26:08,482 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:08,482 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:26:08,483 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:08,484 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:26:08,484 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:08,484 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:26:08,489 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:08,489 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:26:08,609 - DataManager - INFO - Đã lấy 499 candles cho NAS100 H1
+2025-10-02 16:26:08,721 - DataManager - INFO - Đã lấy 499 candles cho NAS100 H4
+2025-10-02 16:26:08,722 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:08,722 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:26:08,826 - DataManager - INFO - Đã lấy 499 candles cho NAS100 D1
+2025-10-02 16:26:08,933 - DataManager - INFO - Đã lấy 499 candles cho NAS100 M15
+2025-10-02 16:26:09,548 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:09,548 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:26:09,565 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:09,565 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:26:09,569 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:09,570 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:26:09,570 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:09,570 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:26:09,577 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:09,577 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:26:09,589 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:09,589 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:26:09,589 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:09,589 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:26:09,601 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:09,602 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:26:09,612 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:09,612 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:26:09,612 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:09,612 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:26:09,625 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:09,625 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:26:09,818 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:09,819 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:26:11,660 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:11,660 - DataManager - WARNING - Không thể lấy dữ liệu cho EURUSD H4
+2025-10-02 16:26:11,671 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:11,671 - DataManager - WARNING - Không thể lấy dữ liệu cho EURUSD H1
+2025-10-02 16:26:11,674 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:11,674 - DataManager - WARNING - Không thể lấy dữ liệu cho XAUUSD M15
+2025-10-02 16:26:11,677 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:11,677 - DataManager - WARNING - Không thể lấy dữ liệu cho BTCUSD D1
+2025-10-02 16:26:11,680 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:11,681 - DataManager - WARNING - Không thể lấy dữ liệu cho EURUSD M15
+2025-10-02 16:26:11,685 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:11,685 - DataManager - WARNING - Không thể lấy dữ liệu cho BTCUSD M15
+2025-10-02 16:26:11,695 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:11,695 - DataManager - WARNING - Không thể lấy dữ liệu cho XAUUSD D1
+2025-10-02 16:26:11,708 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:11,708 - DataManager - WARNING - Không thể lấy dữ liệu cho EURUSD D1
+2025-10-02 16:26:11,710 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:11,710 - DataManager - WARNING - Không thể lấy dữ liệu cho BTCUSD H1
+2025-10-02 16:26:11,718 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:11,718 - DataManager - WARNING - Không thể lấy dữ liệu cho XAUUSD H1
+2025-10-02 16:26:11,719 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:11,719 - DataManager - WARNING - Không thể lấy dữ liệu cho BTCUSD H4
+2025-10-02 16:26:11,921 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:26:11,922 - DataManager - WARNING - Không thể lấy dữ liệu cho XAUUSD H4
+2025-10-02 16:26:11,924 - BotCore - INFO - 📊 Market data fetched for 1 symbols
+2025-10-02 16:26:12,029 - FeatureEngineer - INFO - Đã tính toán 57 features cho NAS100
+2025-10-02 16:26:12,029 - BotCore - ERROR - ❌ Lỗi trong trading cycle: 'total_pnl'
+2025-10-02 16:26:12,385 - Discord - INFO - Discord notification sent successfully
+2025-10-02 16:41:02,433 - BotCore - INFO - 🛑 Stopping Trading Bot...
+2025-10-02 16:41:07,434 - RiskManager - INFO - Real-time monitoring stopped
+2025-10-02 16:41:07,989 - Discord - INFO - Discord notification sent successfully
+2025-10-02 16:41:08,991 - BotCore - INFO - ✅ Trading Bot stopped successfully
+2025-10-02 16:56:19,571 - EnsembleModel - INFO - Đã xây dựng kiến trúc LSTM với Attention
+2025-10-02 16:56:19,572 - BotCore - INFO - 🚀 Starting Trading Bot (cycle interval: 60 minutes)
+2025-10-02 16:56:19,572 - BotCore - INFO - 🚀 Initializing Trading Bot...
+2025-10-02 16:56:19,573 - BotCore - INFO - ✅ Trading Bot initialized successfully
+2025-10-02 16:56:19,865 - Discord - INFO - Discord notification sent successfully
+2025-10-02 16:56:20,867 - RiskManager - INFO - Real-time monitoring started
+2025-10-02 16:56:20,867 - BotCore - INFO - 📈 Starting trading cycle #1
+2025-10-02 16:56:20,999 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:21,000 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:56:21,006 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:21,006 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:56:21,014 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:21,014 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:56:21,128 - DataManager - INFO - Đã lấy 499 candles cho NAS100 M15
+2025-10-02 16:56:21,128 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:21,128 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:56:21,229 - DataManager - INFO - Đã lấy 499 candles cho NAS100 H1
+2025-10-02 16:56:21,231 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:21,231 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:56:21,231 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:21,231 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:56:21,231 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:21,231 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:56:21,231 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:21,231 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:56:21,332 - DataManager - INFO - Đã lấy 499 candles cho NAS100 D1
+2025-10-02 16:56:21,332 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:21,332 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:56:21,333 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:21,333 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:56:21,435 - DataManager - INFO - Đã lấy 499 candles cho NAS100 H4
+2025-10-02 16:56:21,435 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:21,435 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:56:21,435 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:21,435 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 16:56:22,107 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:22,107 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:56:22,112 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:22,112 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:56:22,118 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:22,118 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:56:22,219 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:22,219 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:56:22,317 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:22,317 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:56:22,325 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:22,325 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:56:22,326 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:22,326 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:56:22,329 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:22,329 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:56:22,424 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:22,424 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:56:22,429 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:22,429 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:56:22,525 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:22,525 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:56:22,533 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:22,534 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 16:56:24,206 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:24,207 - DataManager - WARNING - Không thể lấy dữ liệu cho BTCUSD H4
+2025-10-02 16:56:24,217 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:24,217 - DataManager - WARNING - Không thể lấy dữ liệu cho BTCUSD H1
+2025-10-02 16:56:24,243 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:24,243 - DataManager - WARNING - Không thể lấy dữ liệu cho EURUSD M15
+2025-10-02 16:56:24,315 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:24,315 - DataManager - WARNING - Không thể lấy dữ liệu cho BTCUSD D1
+2025-10-02 16:56:24,418 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:24,418 - DataManager - WARNING - Không thể lấy dữ liệu cho XAUUSD M15
+2025-10-02 16:56:24,428 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:24,428 - DataManager - WARNING - Không thể lấy dữ liệu cho XAUUSD H4
+2025-10-02 16:56:24,441 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:24,441 - DataManager - WARNING - Không thể lấy dữ liệu cho EURUSD H4
+2025-10-02 16:56:24,441 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:24,441 - DataManager - WARNING - Không thể lấy dữ liệu cho EURUSD D1
+2025-10-02 16:56:24,528 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:24,528 - DataManager - WARNING - Không thể lấy dữ liệu cho EURUSD H1
+2025-10-02 16:56:24,540 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:24,540 - DataManager - WARNING - Không thể lấy dữ liệu cho BTCUSD M15
+2025-10-02 16:56:24,617 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:24,617 - DataManager - WARNING - Không thể lấy dữ liệu cho XAUUSD H1
+2025-10-02 16:56:24,636 - BotCore - WARNING - API oanda trả về status 400
+2025-10-02 16:56:24,636 - DataManager - WARNING - Không thể lấy dữ liệu cho XAUUSD D1
+2025-10-02 16:56:24,638 - BotCore - INFO - 📊 Market data fetched for 1 symbols
+2025-10-02 16:56:24,744 - FeatureEngineer - INFO - Đã tính toán 57 features cho NAS100
+2025-10-02 16:56:24,744 - BotCore - ERROR - ❌ Lỗi trong trading cycle: 'total_pnl'
+2025-10-02 16:56:25,267 - Discord - INFO - Discord notification sent successfully

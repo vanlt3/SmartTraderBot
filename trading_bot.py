@@ -1564,6 +1564,356 @@ class TrainingCallback(BaseCallback):
         
         return True
 
+class TrendSpecialistAgent:
+    """Specialist Agent cho trend analysis và market regime detection"""
+    
+    def __init__(self):
+        self.logger = LOG_MANAGER.get_logger('TrendSpecialistAgent')
+        self.trend_signals = {}
+        self.market_regime = None
+        
+    async def analyze_trend(self, symbol: str, data: dict) -> dict:
+        """Phân tích trend cho symbol cụ thể"""
+        try:
+            if symbol not in data or data[symbol].empty:
+                return {'trend': 'UNKNOWN', 'confidence': 0.0, 'strength': 0.0}
+            
+            df = data[symbol].copy()
+            
+            # Technical indicators cho trend analysis
+            if len(df) >= 20:
+                df['sma_20'] = df['close'].rolling(window=20).mean()
+                df['sma_50'] = df['close'].rolling(window=50).mean()
+                df['ema_12'] = df['close'].ewm(span=12).mean()
+                df['ema_26'] = df['close'].ewm(span=26).mean()
+                
+                # Trend determination
+                current_price = df['close'].iloc[-1]
+                sma_20 = df['sma_20'].iloc[-1]
+                sma_50 = df['sma_50'].iloc[-1]
+                
+                if current_price > sma_20 > sma_50:
+                    trend = 'UPTREND'
+                    confidence = 0.8
+                elif current_price < sma_20 < sma_50:
+                    trend = 'DOWNTREND'
+                    confidence = 0.8
+                elif sma_20 > sma_50:
+                    trend = 'UPTREND'
+                    confidence = 0.6
+                elif sma_20 < sma_50:
+                    trend = 'DOWNTREND'
+                    confidence = 0.6
+                else:
+                    trend = 'SIDEWAYS'
+                    confidence = 0.4
+                
+                # Strength calculation
+                price_variance = df['close'].rolling(window=20).std().iloc[-1]
+                strength = min(1.0, price_variance / current_price * 100)
+                
+            else:
+                trend = 'INSUFFICIENT_DATA'
+                confidence = 0.0
+                strength = 0.0
+            
+            result = {
+                'trend': trend,
+                'confidence': confidence,
+                'strength': strength,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            self.trend_signals[symbol] = result
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Lỗi trong trend analysis cho {symbol}: {e}")
+            return {'trend': 'ERROR', 'confidence': 0.0, 'strength': 0.0}
+    
+    def get_trend_recommendation(self, symbol: str) -> dict:
+        """Lấy recommendation từ trend analysis"""
+        if symbol in self.trend_signals:
+            signal = self.trend_signals[symbol]
+            return {
+                'action': 'HOLD' if signal['trend'] == 'SIDEWAYS' else ('BUY' if signal['trend'] == 'UPTREND' else 'SELL'),
+                'confidence': signal['confidence'],
+                'reasoning': f"Trend analysis shows {signal['trend']} with {signal['confidence']:.2f} confidence"
+            }
+        return {'action': 'HOLD', 'confidence': 0.0, 'reasoning': 'No trend data available'}
+
+class RiskSpecialistAgent:
+    """Specialist Agent cho risk assessment và position sizing"""
+    
+    def __init__(self):
+        self.logger = LOG_MANAGER.get_logger('RiskSpecialistAgent')
+        self.risk_assessments = {}
+        
+    async def assess_risk(self, symbol: str, data: dict, portfolio_value: float) -> dict:
+        """Đánh giá risk cho symbol"""
+        try:
+            if symbol not in data or data[symbol].empty:
+                return {'risk_level': 'HIGH', 'position_size': 0.0, 'confidence': 0.0}
+            
+            df = data[symbol].copy()
+            
+            # Risk metrics
+            if len(df) >= 20:
+                # Volatility (ATR)
+                df['high_low'] = df['high'] - df['low']
+                df['high_close'] = abs(df['high'] - df['close'].shift(1))
+                df['low_close'] = abs(df['low'] - df['close'].shift(1))
+                df['tr'] = df[['high_low', 'high_close', 'low_close']].max(axis=1)
+                atr = df['tr'].rolling(window=14).mean().iloc[-1]
+                current_price = df['close'].iloc[-1]
+                
+                # Volatility percentage
+                volatility_pct = (atr / current_price) * 100
+                
+                # Risk level determination
+                if volatility_pct < 1.0:
+                    risk_level = 'LOW'
+                    position_size = 0.02  # 2%
+                elif volatility_pct < 2.0:
+                    risk_level = 'MEDIUM'
+                    position_size = 0.015  # 1.5%
+                else:
+                    risk_level = 'HIGH'
+                    position_size = 0.01   # 1%
+                
+                # Recent drawdown
+                recent_high = df['close'].rolling(window=20).max().iloc[-1]
+                drawdown = ((recent_high - current_price) / recent_high) * 100
+                
+                confidence = 0.8 if len(df) >= 50 else 0.6
+                
+            else:
+                risk_level = 'HIGH'
+                position_size = 0.005  # 0.5% default
+                volatility_pct = 5.0
+                drawdown = 0.0
+                confidence = 0.0
+            
+            result = {
+                'risk_level': risk_level,
+                'position_size': position_size,
+                'volatility_pct': volatility_pct,
+                'drawdown': drawdown,
+                'confidence': confidence,
+                'recommended_stop_loss': position_size * 0.5,  # 50% of position as stop loss
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            self.risk_assessments[symbol] = result
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Lỗi trong risk assessment cho {symbol}: {e}")
+            return {'risk_level': 'HIGH', 'position_size': 0.0, 'confidence': 0.0}
+    
+    def get_risk_recommendation(self, symbol: str) -> dict:
+        """Lấy risk recommendation"""
+        if symbol in self.risk_assessments:
+            assessment = self.risk_assessments[symbol]
+            return {
+                'max_position_size': assessment['position_size'],
+                'risk_level': assessment['risk_level'],
+                'stop_loss_size': assessment['recommended_stop_loss'],
+                'confidence': assessment['confidence']
+            }
+        return {
+            'max_position_size': 0.01,  # Default 1%
+            'risk_level': 'MEDIUM',
+            'stop_loss_size': 0.005,
+            'confidence': 0.0
+        }
+
+class NewsSpecialistAgent:
+    """Specialist Agent cho news và sentiment analysis"""
+    
+    def __init__(self, news_manager):
+        self.logger = LOG_MANAGER.get_logger('NewsSpecialistAgent')
+        self.news_manager = news_manager
+        self.sentiment_cache = {}
+        
+    async def analyze_sentiment(self, symbol: str, hours_back: int = 24) -> dict:
+        """Phân tích sentiment từ news"""
+        try:
+            if not self.news_manager:
+                return {'sentiment': 'NEUTRAL', 'confidence': 0.0, 'impact': 'LOW'}
+            
+            # Get latest news
+            news_data = await self.news_manager.fetch_news_data(symbol, hours_back)
+            
+            if not news_data or not news_data.get('articles'):
+                return {'sentiment': 'NEUTRAL', 'confidence': 0.0, 'impact': 'LOW'}
+            
+            # Analyze sentiment using Gemini
+            sentiment_scores = []
+            impact_keywords = ['fomc', 'nfp', 'gdp', 'inflation', 'interest rate', 'fed', 'central bank']
+            
+            for article in news_data['articles'][:10]:  # Limit to 10 articles
+                title = article.get('title', '')
+                description = article.get('description', '')
+                
+                # Check for high impact keywords
+                high_impact = any(keyword in (title + description).lower() for keyword in impact_keywords)
+                
+                # Simple sentiment analysis (positive/negative keywords)
+                text = f"{title} {description}".lower()
+                positive_words = ['positive', 'growth', 'strong', 'increase', 'rise', 'bullish', 'surge', 'gains']
+                negative_words = ['negative', 'decline', 'weak', 'decrease', 'fall', 'bearish', 'drop', 'loss']
+                
+                positive_count = sum(1 for word in positive_words if word in text)
+                negative_count = sum(1 for word in negative_words if word in text)
+                
+                if positive_count > negative_count:
+                    sentiment_scores.append(1.0 if high_impact else 0.5)
+                elif negative_count > positive_count:
+                    sentiment_scores.append(-1.0 if high_impact else -0.5)
+                else:
+                    sentiment_scores.append(0.0)
+            
+            if not sentiment_scores:
+                return {'sentiment': 'NEUTRAL', 'confidence': 0.0, 'impact': 'LOW'}
+            
+            # Calculate overall sentiment
+            avg_sentiment = sum(sentiment_scores) / len(sentiment_scores)
+            
+            if avg_sentiment > 0.3:
+                sentiment = 'POSITIVE'
+                confidence = min(1.0, abs(avg_sentiment))
+            elif avg_sentiment < -0.3:
+                sentiment = 'NEGATIVE'
+                confidence = min(1.0, abs(avg_sentiment))
+            else:
+                sentiment = 'NEUTRAL'
+                confidence = 0.5
+            
+            impact = 'HIGH' if any(abs(score) >= 0.8 for score in sentiment_scores) else 'MEDIUM' if confidence > 0.6 else 'LOW'
+            
+            result = {
+                'sentiment': sentiment,
+                'confidence': confidence,
+                'impact': impact,
+                'news_count': len(news_data['articles']),
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            self.sentiment_cache[symbol] = result
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Lỗi trong sentiment analysis cho {symbol}: {e}")
+            return {'sentiment': 'NEUTRAL', 'confidence': 0.0, 'impact': 'LOW'}
+    
+    def get_sentiment_recommendation(self, symbol: str) -> dict:
+        """Lấy sentiment recommendation"""
+        if symbol in self.sentiment_cache:
+            sentiment_data = self.sentiment_cache[symbol]
+            return {
+                'sentiment': sentiment_data['sentiment'],
+                'confidence': sentiment_data['confidence'],
+                'impact': sentiment_data['impact'],
+                'news_count': sentiment_data['news_count']
+            }
+        return {
+            'sentiment': 'NEUTRAL',
+            'confidence': 0.0,
+            'impact': 'LOW',
+            'news_count': 0
+        }
+
+class MasterAgent:
+    """Master Agent điều phối tất cả specialist agents"""
+    
+    def __init__(self, trend_agent, news_agent, risk_agent):
+        self.logger = LOG_MANAGER.get_logger('MasterAgent')
+        self.trend_agent = trend_agent
+        self.news_agent = news_agent
+        self.risk_agent = risk_agent
+        self.decisions = {}
+        
+    async def make_decision(self, symbol: str, data: dict, portfolio_value: float) -> dict:
+        """Đưa ra quyết định trading cuối cùng"""
+        try:
+            self.logger.info(f"🤖 Master Agent đang phân tích {symbol}...")
+            
+            # Collect insights từ tất cả specialist agents
+            trend_insight = await self.trend_agent.analyze_trend(symbol, data)
+            sentiment_insight = await self.news_agent.analyze_sentiment(symbol)
+            risk_assessment = await self.risk_agent.assess_risk(symbol, data, portfolio_value)
+            
+            # Voting mechanism cho decision
+            votes = {
+                'BUY': 0,
+                'SELL': 0,
+                'HOLD': 0
+            }
+            
+            # Trend vote
+            trend_recommendation = self.trend_agent.get_trend_recommendation(symbol)
+            votes[trend_recommendation['action']] += trend_recommendation['confidence']
+            
+            # Sentiment vote
+            sentiment_recommendation = self.news_agent.get_sentiment_recommendation(symbol)
+            if sentiment_recommendation['sentiment'] == 'POSITIVE':
+                votes['BUY'] += sentiment_recommendation['confidence']
+            elif sentiment_recommendation['sentiment'] == 'NEGATIVE':
+                votes['SELL'] += sentiment_recommendation['confidence']
+            else:
+                votes['HOLD'] += sentiment_recommendation['confidence']
+            
+            # Risk assessment giới hạn position size
+            max_position_size = risk_assessment['position_size']
+            
+            # Final decision
+            best_action = max(votes, key=votes.get)
+            confidence = votes[best_action] / max(1, sum(votes.values()))
+            
+            # Override với risk-based limits
+            if risk_assessment['risk_level'] == 'HIGH' and best_action != 'HOLD':
+                best_action = 'HOLD'
+                confidence *= 0.5  # Reduce confidence
+            
+            decision = {
+                'action': best_action,
+                'confidence': confidence,
+                'position_size': min(max_position_size, 0.02),  # Cap at 2%
+                'reasoning': {
+                    'trend': trend_recommendation,
+                    'sentiment': sentiment_recommendation,
+                    'risk': {
+                        'level': risk_assessment['risk_level'],
+                        'max_size': risk_assessment['position_size']
+                    }
+                },
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            self.decisions[symbol] = decision
+            self.logger.info(f"✅ Master Agent quyết định: {best_action} {symbol} với confidence {confidence:.2f}")
+            
+            return decision
+            
+        except Exception as e:
+            self.logger.error(f"Lỗi trong decision making cho {symbol}: {e}")
+            return {
+                'action': 'HOLD',
+                'confidence': 0.0,
+                'position_size': 0.0,
+                'reasoning': {'error': str(e)},
+                'timestamp': datetime.now().isoformat()
+            }
+    
+    def get_last_decision(self, symbol: str) -> dict:
+        """Lấy decision gần nhất cho symbol"""
+        return self.decisions.get(symbol, {
+            'action': 'HOLD',
+            'confidence': 0.0,
+            'timestamp': datetime.now().isoformat()
+        })
+
 class RLAgent:
     """RL Agent sử dụng PPO từ stable-baselines3"""
     
