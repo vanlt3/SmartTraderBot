@@ -1595,11 +1595,11 @@ class LSTMModel:
         inputs = Input(shape=(self.sequence_length, self.feature_dim), name='input_sequences')
         
         # Batch normalization
-        bn_input = BatchNormalization()(inputs)
+        bn_input = BatchNormalization(axis=-1)(inputs)
         
         # First LSTM layer with dropout
         lstm1 = LSTM(128, return_sequences=True, dropout=0.2, recurrent_dropout=0.2)(bn_input)
-        lstm1_bn = BatchNormalization()(lstm1)
+        lstm1_bn = BatchNormalization(axis=-1)(lstm1)
         
         # Attention mechanism
         attention = tf.keras.layers.MultiHeadAttention(
@@ -1610,7 +1610,7 @@ class LSTMModel:
         
         # Second LSTM layer
         lstm2 = LSTM(64, return_sequences=False, dropout=0.2, recurrent_dropout=0.2)(attention)
-        lstm2_bn = BatchNormalization()(lstm2)
+        lstm2_bn = BatchNormalization(axis=-1)(lstm2)
         
         # Dense layers
         dense1 = Dense(64, activation='relu')(lstm2_bn)
@@ -1669,6 +1669,15 @@ class LSTMModel:
         
         # Prepare sequences
         X_seq, y_seq = self.prepare_sequences(X, y)
+        
+        # Validate sequences
+        if len(X_seq) == 0:
+            self.logger.error("No sequences created from input data")
+            return {'error': 'Insufficient data for training'}
+        
+        if X_seq.shape[1] != self.sequence_length:
+            self.logger.error(f"Sequence length mismatch: expected {self.sequence_length}, got {X_seq.shape[1]}")
+            return {'error': 'Data preprocessing error'}
         
         # Split data
         split_idx = int(len(X_seq) * (1 - validation_split))
@@ -3836,9 +3845,23 @@ class TradingBotController:
             
             # 2. Engineer features
             enriched_data = {}
-            for symbol, df in market_data.items():
-                if not df.empty:
-                    enriched_data[symbol] = self.feature_engineer.engineer_all_features(df.copy(), symbol)
+            for symbol, timeframes in market_data.items():
+                # Combine all timeframes into a single DataFrame for feature engineering
+                combined_df = None
+                for timeframe, df in timeframes.items():
+                    if df is not None and hasattr(df, 'empty') and not df.empty:
+                        # Add timeframe suffix to columns to avoid conflicts
+                        df_with_timeframe = df.copy()
+                        df_with_timeframe.columns = [f"{col}_{timeframe}" if col not in ['datetime', 'timestamp'] else col for col in df.columns]
+                        
+                        if combined_df is None:
+                            combined_df = df_with_timeframe.copy()
+                        else:
+                            # Temporal alignment: align on datetime/timestamp
+                            combined_df = pd.merge(combined_df, df_with_timeframe, on='datetime', how='outer', suffixes=('', f'_{timeframe}'))
+                
+                if combined_df is not None and not combined_df.empty:
+                    enriched_data[symbol] = self.feature_engineer.engineer_all_features(combined_df, symbol)
             
             # 3. Analyze and decide
             portfolio_status = self._get_portfolio_status()
@@ -4090,7 +4113,12 @@ class TradingBotController:
         try:
             # Update online learning models
             for symbol, df in enriched_data.items():
-                if len(df) > Config.FEATURE_WINDOW:
+                # Make sure df is a DataFrame, not a dict
+                if isinstance(df, dict):
+                    # Skip dict entries - they should be timeframes
+                    continue
+                    
+                if hasattr(df, 'empty') and not df.empty and len(df) > Config.FEATURE_WINDOW:
                     # Get latest features
                     latest_row = df.iloc[-1:].select_dtypes(include=[np.number])
                     latest_features = latest_row.values[0] if not latest_row.empty else np.array([])
