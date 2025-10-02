@@ -1373,7 +1373,7 @@ class EnsembleModel:
         
         # Run optimization
         study = optuna.create_study(direction='maximize')
-        study.optimize(objective, n_trials=20)
+        study.optimize(objective, n_trials=100)
         
         self.logger.info(f"Best {model_name} params: {study.best_params}")
         return study.best_params
@@ -2485,7 +2485,7 @@ class MasterAgent:
             # Train RL Agent
             if self.rl_agent and self.rl_agent.model:
                 try:
-                    self.rl_agent.train(total_timesteps=10000)
+                    self.rl_agent.train(total_timesteps=50000)
                     training_results['rl'] = {'status': 'trained', 'timesteps': 10000}
                     self.logger.info("✅ RL Agent training completed")
                 except Exception as e:
