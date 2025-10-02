@@ -91,7 +91,8 @@ class Config:
     
     # Trading Symbols
     SYMBOLS = ["XAUUSD", "EURUSD", "NAS100", "BTCUSD"]
-    SYMBOL_MAPPING = {"NAS100": "NAS100_USD"}  # Map for OANDA API
+    SYMBOL_MAPPING = {"NAS100": "NAS100_USD", "EURUSD": "EURUSD"}  # Only forex/indices supported by Oanda
+    # Note: XAUUSD and BTCUSD might not be supported by Oanda, consider using alternative APIs
     
     # Risk Management
     MAX_POSITION_SIZE = 0.02  # 2% per trade
@@ -414,6 +415,11 @@ class EnhancedDataManager:
     async def fetch_market_data(self, symbol: str, timeframe: str, count: int = 500) -> Optional[pd.DataFrame]:
         """Lấy dữ liệu thị trường từ OANDA API"""
         
+        # Check if symbol is supported by Oanda
+        if symbol not in Config.SYMBOL_MAPPING:
+            self.logger.warning(f"Symbol {symbol} not supported by Oanda API, skipping data fetch")
+            return None
+            
         oanda_symbol = self._get_oanda_symbol(symbol)
         url = f"{Config.OANDA_URL}/instruments/{oanda_symbol}/candles"
         
@@ -443,8 +449,11 @@ class EnhancedDataManager:
             
             self.logger.info(f"Đã lấy {len(df)} candles cho {symbol} {timeframe}")
             return df
+        elif data and 'errorMessage' in data:
+            self.logger.warning(f"Oanda API error for {symbol} {timeframe}: {data['errorMessage']}")
+        else:
+            self.logger.warning(f"Không thể lấy dữ liệu cho {symbol} {timeframe}")
         
-        self.logger.warning(f"Không thể lấy dữ liệu cho {symbol} {timeframe}")
         return None
     
     def _process_oanda_data(self, candles: List[Dict]) -> pd.DataFrame:
@@ -1743,18 +1752,19 @@ class NewsSpecialistAgent:
                 return {'sentiment': 'NEUTRAL', 'confidence': 0.0, 'impact': 'LOW'}
             
             # Get latest news
-            news_data = await self.news_manager.fetch_news_data(symbol, hours_back)
+            news_data = await self.news_manager.fetch_news_sentiment(symbol, hours_back)
             
-            if not news_data or not news_data.get('articles'):
+            if not news_data or not news_data.get('latest_news_items'):
                 return {'sentiment': 'NEUTRAL', 'confidence': 0.0, 'impact': 'LOW'}
             
             # Analyze sentiment using Gemini
             sentiment_scores = []
             impact_keywords = ['fomc', 'nfp', 'gdp', 'inflation', 'interest rate', 'fed', 'central bank']
             
-            for article in news_data['articles'][:10]:  # Limit to 10 articles
-                title = article.get('title', '')
-                description = article.get('description', '')
+            for article in news_data['latest_news_items'][:10]:  # Limit to 10 articles
+                text = article.get('text', '')
+                title = text  # Use text as both title and description
+                description = text
                 
                 # Check for high impact keywords
                 high_impact = any(keyword in (title + description).lower() for keyword in impact_keywords)
@@ -2604,7 +2614,7 @@ class DiscordNotificationManager:
             "color": 0x0099ff,
             "fields": [
                 {"name": "Portfolio Value", "value": f"${metrics.get('total_value', 0):,.2f}", "inline": True},
-                {"name": "Daily P&L", "value": f"${metrics.get('total_pnl', 0):,.2f}", "inline": True},
+                {"name": "Daily P&L", "value": f"${metrics.get('daily_pnl', 0):,.2f}", "inline": True},
                 {"name": "Daily Return", "value": f"{metrics.get('daily_return', 0):.2f}%", "inline": True},
                 {"name": "Sharpe Ratio", "value": f"{metrics.get('sharpe_ratio', 0):.3f}", "inline": True},
                 {"name": "Max Drawdown", "value": f"{metrics.get('max_drawdown', 0):.2f}%", "inline": True},
@@ -3204,7 +3214,8 @@ class TradingBotController:
             for symbol, df in enriched_data.items():
                 if len(df) > Config.FEATURE_WINDOW:
                     # Get latest features
-                    latest_features = df.iloc[-1].select_dtypes(include=[np.number]).values
+                    latest_row = df.iloc[-1:].select_dtypes(include=[np.number])
+                    latest_features = latest_row.values[0] if not latest_row.empty else np.array([])
                     
                     # Create target (simplified: +1 if price went up next period, 0 otherwise)
                     if len(df) > 1:
