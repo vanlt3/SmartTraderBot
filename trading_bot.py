@@ -1254,12 +1254,18 @@ class EnsembleModel:
                 }
             elif model_name == 'lightgbm':
                 params = {
+                    'num_leaves': trial.suggest_int('num_leaves', 10, 100),
                     'max_depth': trial.suggest_int('max_depth', 3, 10),
                     'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3),
                     'n_estimators': trial.suggest_int('n_estimators', 50, 1000),
                     'subsample': trial.suggest_float('subsample', 0.6, 1.0),
                     'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 1.0),
-                    'min_child_samples': trial.suggest_int('min_child_samples', 10, 100)
+                    'min_child_samples': trial.suggest_int('min_child_samples', 10, 100),
+                    'min_data_in_leaf': trial.suggest_int('min_data_in_leaf', 5, 50),
+                    'min_sum_hessian_in_leaf': trial.suggest_float('min_sum_hessian_in_leaf', 1e-3, 1.0),
+                    'max_bin': trial.suggest_int('max_bin', 50, 255),
+                    'force_col_wise': True,
+                    'verbosity': -1
                 }
             elif model_name == 'random_forest':
                 params = {
