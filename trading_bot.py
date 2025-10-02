@@ -1913,6 +1913,87 @@ class MasterAgent:
             'confidence': 0.0,
             'timestamp': datetime.now().isoformat()
         })
+    
+    async def analyze_and_decide(self, enriched_data: dict, portfolio_status: dict) -> dict:
+        """Analyze enriched data from all symbols and make comprehensive trading decisions"""
+        try:
+            self.logger.info("🤖 Master Agent analyzing enriched data for trading decisions...")
+            
+            decisions = {}
+            buy_signals = []
+            sell_signals = []
+            
+            # Analyze each symbol in enriched data
+            for symbol, features_data in enriched_data.items():
+                if features_data is None or features_data.empty:
+                    continue
+                    
+                # Get latest row for decision making
+                latest_data = features_data.iloc[-1].to_dict()
+                
+                # Make individual decision for this symbol
+                individual_decision = await self.make_decision(symbol, latest_data, portfolio_status.get('total_value', 100000))
+                decisions[symbol] = individual_decision
+                
+                # Collect signals
+                if individual_decision['action'] == 'BUY' and individual_decision['confidence'] > 0.6:
+                    buy_signals.append({
+                        'symbol': symbol,
+                        'confidence': individual_decision['confidence'],
+                        'position_size': individual_decision.get('position_size', 0.02)
+                    })
+                elif individual_decision['action'] == 'SELL' and individual_decision['confidence'] > 0.6:
+                    sell_signals.append({
+                        'symbol': symbol,
+                        'confidence': individual_decision['confidence'],
+                        'position_size': individual_decision.get('position_size', 0.02)
+                    })
+            
+            # Calculate overall signal strength
+            total_confidence = sum(s['confidence'] for s in buy_signals + sell_signals)
+            signal_count = len(buy_signals) + len(sell_signals)
+            signal_strength = total_confidence / max(signal_count, 1) if signal_count > 0 else 0
+            
+            # Determine market regime
+            market_regime = 'NEUTRAL'
+            if len(buy_signals) > len(sell_signals) and signal_strength > 0.7:
+                market_regime = 'BULLISH'
+            elif len(sell_signals) > len(buy_signals) and signal_strength > 0.7:
+                market_regime = 'BEARISH'
+            
+            # Comprehensive decision
+            comprehensive_decision = {
+                'signal_strength': signal_strength,
+                'confidence': signal_strength,
+                'market_regime': market_regime,
+                'buy_signals': buy_signals,
+                'sell_signals': sell_signals,
+                'individual_decisions': decisions,
+                'portfolio_status': portfolio_status,
+                'total_signals': len(buy_signals) + len(sell_signals),
+                'recommended_action': 'BUY' if market_regime == 'BULLISH' else 'SELL' if market_regime == 'BEARISH' else 'HOLD',
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            self.logger.info(f"✅ Master Agent analysis complete: {market_regime} market, {signal_strength:.2f} signal strength, {len(buy_signals)} buy, {len(sell_signals)} sell")
+            
+            return comprehensive_decision
+            
+        except Exception as e:
+            self.logger.error(f"❌ Lỗi trong analyze_and_decide: {e}")
+            return {
+                'signal_strength': 0.0,
+                'confidence': 0.0,
+                'market_regime': 'NEUTRAL',
+                'buy_signals': [],
+                'sell_signals': [],
+                'individual_decisions': {},
+                'portfolio_status': portfolio_status,
+                'total_signals': 0,
+                'recommended_action': 'HOLD',
+                'timestamp': datetime.now().isoformat(),
+                'error': str(e)
+            }
 
 class RLAgent:
     """RL Agent sử dụng PPO từ stable-baselines3"""
