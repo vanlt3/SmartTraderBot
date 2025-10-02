@@ -2215,15 +2215,15 @@ class OnlineLearningManager:
         self.online_models = {}
         
         # Initialize adaptive models cho từng symbol
-        self.online_models = {
-            symbol: {
+        self.online_models = {}
+        for symbol in Config.SYMBOLS:
+            self.online_models[symbol] = {
                 'linear_model': linear_model.LogisticRegression(),
                 'preprocessor': preprocessing.StandardScaler(),
                 'anomaly_detector': anomaly.OneClassSVM(),
-                'performance_history': []
+                'performance_history': [],
+                'initialized': False
             }
-            for symbol in Config.SYMBOLS
-        }
     
     def _numpy_to_dict(self, features: np.ndarray) -> Dict[str, float]:
         """Convert numpy array to dict format for River framework"""
@@ -2255,7 +2255,19 @@ class OnlineLearningManager:
             if model_info['preprocessor'] is None:
                 self.logger.warning(f"Preprocessor is None for {symbol}, skipping model update")
                 return
-            scaled_features = model_info['preprocessor'].learn_one(features_dict).transform_one(features_dict)
+            
+            # Handle case where learn_one returns None (common with River framework)
+            preprocessor_result = model_info['preprocessor'].learn_one(features_dict)
+            if preprocessor_result is None:
+                # For StandardScaler, we can still transform without learning first
+                try:
+                    scaled_features = model_info['preprocessor'].transform_one(features_dict)
+                    model_info['initialized'] = True  # Mark as initialized on successful transform
+                except Exception as e:
+                    self.logger.warning(f"Could not transform features for {symbol}: {e}. Model not yet initialized with enough data.")
+                    return
+            else:
+                scaled_features = preprocessor_result.transform_one(features_dict)
             
             # Update anomaly detector
             model_info['anomaly_detector'].learn_one(scaled_features)
@@ -2293,7 +2305,12 @@ class OnlineLearningManager:
             if model_info['preprocessor'] is None:
                 self.logger.warning(f"Preprocessor is None for {symbol}, returning default prediction")
                 return 0.0
-            scaled_features = model_info['preprocessor'].transform_one(features_dict)
+            
+            try:
+                scaled_features = model_info['preprocessor'].transform_one(features_dict)
+            except Exception as e:
+                self.logger.warning(f"Could not transform features for {symbol}: {e}. Model not yet initialized.")
+                return 0.0
             
             prediction = model_info['linear_model'].predict_one(scaled_features)
             confidence = 1.0 - np.mean(model_info['performance_history'][-10:]) if model_info['performance_history'] else 0.5
@@ -2315,7 +2332,12 @@ class OnlineLearningManager:
             if model_info['preprocessor'] is None:
                 self.logger.warning(f"Preprocessor is None for {symbol}, returning no anomaly")
                 return False
-            scaled_features = model_info['preprocessor'].transform_one(features)
+            
+            try:
+                scaled_features = model_info['preprocessor'].transform_one(features)
+            except Exception as e:
+                self.logger.warning(f"Could not transform features for {symbol}: {e}. Model not yet initialized.")
+                return False
             
             # Check if current data is anomaly
             anomaly_score = model_info['anomaly_detector'].score_one(scaled_features)
