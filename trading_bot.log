@@ -176,3 +176,361 @@
 2025-10-02 16:56:24,744 - FeatureEngineer - INFO - Đã tính toán 57 features cho NAS100
 2025-10-02 16:56:24,744 - BotCore - ERROR - ❌ Lỗi trong trading cycle: 'total_pnl'
 2025-10-02 16:56:25,267 - Discord - INFO - Discord notification sent successfully
+2025-10-02 17:18:32,601 - EnsembleModel - INFO - Đã xây dựng kiến trúc LSTM với Attention
+2025-10-02 17:18:32,601 - BotCore - INFO - 🚀 Starting Trading Bot (cycle interval: 60 minutes)
+2025-10-02 17:18:32,601 - BotCore - INFO - 🚀 Initializing Trading Bot...
+2025-10-02 17:18:32,601 - BotCore - INFO - ✅ Trading Bot initialized successfully
+2025-10-02 17:18:32,939 - Discord - INFO - Discord notification sent successfully
+2025-10-02 17:18:33,942 - RiskManager - INFO - Real-time monitoring started
+2025-10-02 17:18:33,942 - BotCore - INFO - 📈 Starting trading cycle #1
+2025-10-02 17:18:34,327 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:34,327 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:18:34,327 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:34,327 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:18:34,328 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:34,328 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:18:34,328 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:34,328 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:18:34,328 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:34,329 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:18:34,329 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:34,330 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:18:34,330 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:34,330 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:18:34,330 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:34,330 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:18:34,330 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:34,330 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:18:34,331 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:34,331 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:18:34,333 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:34,333 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:18:34,335 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:34,335 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:18:34,336 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:34,336 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:18:34,336 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:34,336 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:18:34,348 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:34,348 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:18:34,355 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:34,355 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:18:35,589 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:35,589 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:18:35,594 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:35,594 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:18:35,594 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:35,594 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:18:35,599 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:35,599 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:18:35,603 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:35,603 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:18:35,604 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:35,604 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:18:35,606 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:35,606 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:18:35,612 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:35,612 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:18:35,618 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:35,618 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:18:35,624 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:35,624 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:18:35,625 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:35,625 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:18:35,625 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:35,625 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:18:35,626 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:35,626 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:18:35,631 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:35,631 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:18:35,636 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:35,637 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:18:35,637 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:35,637 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:18:37,855 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:37,856 - DataManager - WARNING - Không thể lấy dữ liệu cho BTCUSD M15: No data returned
+2025-10-02 17:18:37,856 - DataManager - INFO - Using synthetic data fallback for BTCUSD M15
+2025-10-02 17:18:37,866 - DataManager - INFO - Generated 500 synthetic candles cho BTCUSD M15
+2025-10-02 17:18:37,870 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:37,870 - DataManager - WARNING - Không thể lấy dữ liệu cho NAS100 H1: No data returned
+2025-10-02 17:18:37,870 - DataManager - INFO - Using synthetic data fallback for NAS100 H1
+2025-10-02 17:18:37,878 - DataManager - INFO - Generated 500 synthetic candles cho NAS100 H1
+2025-10-02 17:18:37,884 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:37,884 - DataManager - WARNING - Không thể lấy dữ liệu cho XAUUSD M15: No data returned
+2025-10-02 17:18:37,884 - DataManager - INFO - Using synthetic data fallback for XAUUSD M15
+2025-10-02 17:18:37,891 - DataManager - INFO - Generated 500 synthetic candles cho XAUUSD M15
+2025-10-02 17:18:37,892 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:37,892 - DataManager - WARNING - Không thể lấy dữ liệu cho EURUSD H1: No data returned
+2025-10-02 17:18:37,892 - DataManager - INFO - Using synthetic data fallback for EURUSD H1
+2025-10-02 17:18:37,900 - DataManager - INFO - Generated 500 synthetic candles cho EURUSD H1
+2025-10-02 17:18:37,900 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:37,900 - DataManager - WARNING - Không thể lấy dữ liệu cho EURUSD H4: No data returned
+2025-10-02 17:18:37,900 - DataManager - INFO - Using synthetic data fallback for EURUSD H4
+2025-10-02 17:18:37,907 - DataManager - INFO - Generated 500 synthetic candles cho EURUSD H4
+2025-10-02 17:18:37,908 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:37,908 - DataManager - WARNING - Không thể lấy dữ liệu cho EURUSD D1: No data returned
+2025-10-02 17:18:37,908 - DataManager - INFO - Using synthetic data fallback for EURUSD D1
+2025-10-02 17:18:37,915 - DataManager - INFO - Generated 500 synthetic candles cho EURUSD D1
+2025-10-02 17:18:37,916 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:37,916 - DataManager - WARNING - Không thể lấy dữ liệu cho XAUUSD D1: No data returned
+2025-10-02 17:18:37,916 - DataManager - INFO - Using synthetic data fallback for XAUUSD D1
+2025-10-02 17:18:37,923 - DataManager - INFO - Generated 500 synthetic candles cho XAUUSD D1
+2025-10-02 17:18:37,923 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:37,923 - DataManager - WARNING - Không thể lấy dữ liệu cho NAS100 H4: No data returned
+2025-10-02 17:18:37,923 - DataManager - INFO - Using synthetic data fallback for NAS100 H4
+2025-10-02 17:18:37,930 - DataManager - INFO - Generated 500 synthetic candles cho NAS100 H4
+2025-10-02 17:18:37,931 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:37,931 - DataManager - WARNING - Không thể lấy dữ liệu cho BTCUSD H4: No data returned
+2025-10-02 17:18:37,931 - DataManager - INFO - Using synthetic data fallback for BTCUSD H4
+2025-10-02 17:18:37,938 - DataManager - INFO - Generated 500 synthetic candles cho BTCUSD H4
+2025-10-02 17:18:37,938 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:37,938 - DataManager - WARNING - Không thể lấy dữ liệu cho NAS100 D1: No data returned
+2025-10-02 17:18:37,938 - DataManager - INFO - Using synthetic data fallback for NAS100 D1
+2025-10-02 17:18:37,946 - DataManager - INFO - Generated 500 synthetic candles cho NAS100 D1
+2025-10-02 17:18:37,946 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:37,946 - DataManager - WARNING - Không thể lấy dữ liệu cho EURUSD M15: No data returned
+2025-10-02 17:18:37,946 - DataManager - INFO - Using synthetic data fallback for EURUSD M15
+2025-10-02 17:18:37,953 - DataManager - INFO - Generated 500 synthetic candles cho EURUSD M15
+2025-10-02 17:18:37,953 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:37,953 - DataManager - WARNING - Không thể lấy dữ liệu cho XAUUSD H1: No data returned
+2025-10-02 17:18:37,953 - DataManager - INFO - Using synthetic data fallback for XAUUSD H1
+2025-10-02 17:18:37,961 - DataManager - INFO - Generated 500 synthetic candles cho XAUUSD H1
+2025-10-02 17:18:37,961 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:37,961 - DataManager - WARNING - Không thể lấy dữ liệu cho XAUUSD H4: No data returned
+2025-10-02 17:18:37,961 - DataManager - INFO - Using synthetic data fallback for XAUUSD H4
+2025-10-02 17:18:37,968 - DataManager - INFO - Generated 500 synthetic candles cho XAUUSD H4
+2025-10-02 17:18:37,969 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:37,969 - DataManager - WARNING - Không thể lấy dữ liệu cho BTCUSD D1: No data returned
+2025-10-02 17:18:37,969 - DataManager - INFO - Using synthetic data fallback for BTCUSD D1
+2025-10-02 17:18:37,976 - DataManager - INFO - Generated 500 synthetic candles cho BTCUSD D1
+2025-10-02 17:18:37,976 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:37,976 - DataManager - WARNING - Không thể lấy dữ liệu cho NAS100 M15: No data returned
+2025-10-02 17:18:37,976 - DataManager - INFO - Using synthetic data fallback for NAS100 M15
+2025-10-02 17:18:37,991 - DataManager - INFO - Generated 500 synthetic candles cho NAS100 M15
+2025-10-02 17:18:37,992 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:18:37,992 - DataManager - WARNING - Không thể lấy dữ liệu cho BTCUSD H1: No data returned
+2025-10-02 17:18:37,992 - DataManager - INFO - Using synthetic data fallback for BTCUSD H1
+2025-10-02 17:18:37,999 - DataManager - INFO - Generated 500 synthetic candles cho BTCUSD H1
+2025-10-02 17:18:38,000 - BotCore - INFO - 📊 Market data fetched for 4 symbols
+2025-10-02 17:18:38,090 - FeatureEngineer - INFO - Đã tính toán 57 features cho XAUUSD
+2025-10-02 17:18:38,177 - FeatureEngineer - INFO - Đã tính toán 57 features cho EURUSD
+2025-10-02 17:18:38,265 - FeatureEngineer - INFO - Đã tính toán 57 features cho NAS100
+2025-10-02 17:18:38,352 - FeatureEngineer - INFO - Đã tính toán 57 features cho BTCUSD
+2025-10-02 17:18:38,352 - MasterAgent - INFO - 🧠 Master Agent đang phân tích tổng thể thị trường...
+2025-10-02 17:18:38,352 - MasterAgent - INFO - 🤖 Master Agent đang phân tích XAUUSD...
+2025-10-02 17:18:38,352 - NewsSpecialistAgent - ERROR - Lỗi trong sentiment analysis cho XAUUSD: 'NewsEconomicManager' object has no attribute 'fetch_news_data'
+2025-10-02 17:18:38,352 - MasterAgent - INFO - ✅ Master Agent quyết định: HOLD XAUUSD với confidence 0.00
+2025-10-02 17:18:38,352 - MasterAgent - INFO - 📊 XAUUSD: HOLD (confidence: 0.00)
+2025-10-02 17:18:38,352 - MasterAgent - INFO - 🤖 Master Agent đang phân tích EURUSD...
+2025-10-02 17:18:38,352 - NewsSpecialistAgent - ERROR - Lỗi trong sentiment analysis cho EURUSD: 'NewsEconomicManager' object has no attribute 'fetch_news_data'
+2025-10-02 17:18:38,352 - MasterAgent - INFO - ✅ Master Agent quyết định: HOLD EURUSD với confidence 0.00
+2025-10-02 17:18:38,352 - MasterAgent - INFO - 📊 EURUSD: HOLD (confidence: 0.00)
+2025-10-02 17:18:38,352 - MasterAgent - INFO - 🤖 Master Agent đang phân tích NAS100...
+2025-10-02 17:18:38,352 - NewsSpecialistAgent - ERROR - Lỗi trong sentiment analysis cho NAS100: 'NewsEconomicManager' object has no attribute 'fetch_news_data'
+2025-10-02 17:18:38,352 - MasterAgent - INFO - ✅ Master Agent quyết định: HOLD NAS100 với confidence 0.00
+2025-10-02 17:18:38,352 - MasterAgent - INFO - 📊 NAS100: HOLD (confidence: 0.00)
+2025-10-02 17:18:38,352 - MasterAgent - INFO - 🤖 Master Agent đang phân tích BTCUSD...
+2025-10-02 17:18:38,352 - NewsSpecialistAgent - ERROR - Lỗi trong sentiment analysis cho BTCUSD: 'NewsEconomicManager' object has no attribute 'fetch_news_data'
+2025-10-02 17:18:38,352 - MasterAgent - INFO - ✅ Master Agent quyết định: HOLD BTCUSD với confidence 0.00
+2025-10-02 17:18:38,352 - MasterAgent - INFO - 📊 BTCUSD: HOLD (confidence: 0.00)
+2025-10-02 17:18:38,352 - MasterAgent - INFO - 🎯 Quyết định tổng thể: NEUTRAL (signal_strength: 0.50, confidence: 0.00)
+2025-10-02 17:18:38,353 - BotCore - ERROR - Lỗi cập nhật models: 'Series' object has no attribute 'select_dtypes'
+2025-10-02 17:18:39,116 - Discord - INFO - Discord notification sent successfully
+2025-10-02 17:18:40,118 - BotCore - INFO - 📊 Performance report sent
+2025-10-02 17:18:40,118 - BotCore - INFO - ✅ Trading cycle #1 completed in 6.18s
+2025-10-02 17:19:22,562 - EnsembleModel - INFO - Đã xây dựng kiến trúc LSTM với Attention
+2025-10-02 17:19:22,563 - BotCore - INFO - 🚀 Starting Trading Bot (cycle interval: 60 minutes)
+2025-10-02 17:19:22,563 - BotCore - INFO - 🚀 Initializing Trading Bot...
+2025-10-02 17:19:22,563 - BotCore - INFO - ✅ Trading Bot initialized successfully
+2025-10-02 17:19:23,178 - Discord - INFO - Discord notification sent successfully
+2025-10-02 17:19:24,180 - RiskManager - INFO - Real-time monitoring started
+2025-10-02 17:19:24,180 - BotCore - INFO - 📈 Starting trading cycle #1
+2025-10-02 17:19:24,501 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:24,501 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:19:24,507 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:24,507 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:19:24,511 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:24,511 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:19:24,513 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:24,513 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:19:24,514 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:24,514 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:19:24,516 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:24,516 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:19:24,518 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:24,518 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:19:24,519 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:24,519 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:19:24,524 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:24,524 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:19:24,526 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:24,526 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:19:24,540 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:24,541 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:19:24,541 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:24,541 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:19:24,553 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:24,553 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:19:24,561 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:24,561 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:19:24,578 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:24,578 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:19:24,594 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:24,594 - BotCore - INFO - Retry 1/3 cho oanda, chờ 1s...
+2025-10-02 17:19:25,759 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:25,759 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:19:25,773 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:25,773 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:19:25,776 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:25,776 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:19:25,783 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:25,783 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:19:25,787 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:25,787 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:19:25,788 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:25,788 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:19:25,796 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:25,797 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:19:25,801 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:25,801 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:19:25,810 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:25,810 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:19:25,813 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:25,813 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:19:25,822 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:25,822 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:19:25,824 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:25,824 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:19:25,839 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:25,839 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:19:25,843 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:25,843 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:19:25,845 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:25,846 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:19:25,864 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:25,864 - BotCore - INFO - Retry 2/3 cho oanda, chờ 2s...
+2025-10-02 17:19:28,026 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:28,027 - DataManager - WARNING - Không thể lấy dữ liệu cho XAUUSD D1: No data returned
+2025-10-02 17:19:28,027 - DataManager - INFO - Using synthetic data fallback for XAUUSD D1
+2025-10-02 17:19:28,037 - DataManager - INFO - Generated 500 synthetic candles cho XAUUSD D1
+2025-10-02 17:19:28,037 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:28,038 - DataManager - WARNING - Không thể lấy dữ liệu cho NAS100 D1: No data returned
+2025-10-02 17:19:28,038 - DataManager - INFO - Using synthetic data fallback for NAS100 D1
+2025-10-02 17:19:28,045 - DataManager - INFO - Generated 500 synthetic candles cho NAS100 D1
+2025-10-02 17:19:28,058 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:28,058 - DataManager - WARNING - Không thể lấy dữ liệu cho BTCUSD D1: No data returned
+2025-10-02 17:19:28,058 - DataManager - INFO - Using synthetic data fallback for BTCUSD D1
+2025-10-02 17:19:28,065 - DataManager - INFO - Generated 500 synthetic candles cho BTCUSD D1
+2025-10-02 17:19:28,066 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:28,066 - DataManager - WARNING - Không thể lấy dữ liệu cho NAS100 H1: No data returned
+2025-10-02 17:19:28,066 - DataManager - INFO - Using synthetic data fallback for NAS100 H1
+2025-10-02 17:19:28,073 - DataManager - INFO - Generated 500 synthetic candles cho NAS100 H1
+2025-10-02 17:19:28,073 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:28,074 - DataManager - WARNING - Không thể lấy dữ liệu cho EURUSD H4: No data returned
+2025-10-02 17:19:28,074 - DataManager - INFO - Using synthetic data fallback for EURUSD H4
+2025-10-02 17:19:28,081 - DataManager - INFO - Generated 500 synthetic candles cho EURUSD H4
+2025-10-02 17:19:28,081 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:28,082 - DataManager - WARNING - Không thể lấy dữ liệu cho EURUSD M15: No data returned
+2025-10-02 17:19:28,082 - DataManager - INFO - Using synthetic data fallback for EURUSD M15
+2025-10-02 17:19:28,089 - DataManager - INFO - Generated 500 synthetic candles cho EURUSD M15
+2025-10-02 17:19:28,089 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:28,089 - DataManager - WARNING - Không thể lấy dữ liệu cho NAS100 H4: No data returned
+2025-10-02 17:19:28,089 - DataManager - INFO - Using synthetic data fallback for NAS100 H4
+2025-10-02 17:19:28,097 - DataManager - INFO - Generated 500 synthetic candles cho NAS100 H4
+2025-10-02 17:19:28,097 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:28,097 - DataManager - WARNING - Không thể lấy dữ liệu cho BTCUSD H1: No data returned
+2025-10-02 17:19:28,097 - DataManager - INFO - Using synthetic data fallback for BTCUSD H1
+2025-10-02 17:19:28,105 - DataManager - INFO - Generated 500 synthetic candles cho BTCUSD H1
+2025-10-02 17:19:28,105 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:28,105 - DataManager - WARNING - Không thể lấy dữ liệu cho XAUUSD M15: No data returned
+2025-10-02 17:19:28,105 - DataManager - INFO - Using synthetic data fallback for XAUUSD M15
+2025-10-02 17:19:28,113 - DataManager - INFO - Generated 500 synthetic candles cho XAUUSD M15
+2025-10-02 17:19:28,113 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:28,113 - DataManager - WARNING - Không thể lấy dữ liệu cho XAUUSD H4: No data returned
+2025-10-02 17:19:28,113 - DataManager - INFO - Using synthetic data fallback for XAUUSD H4
+2025-10-02 17:19:28,121 - DataManager - INFO - Generated 500 synthetic candles cho XAUUSD H4
+2025-10-02 17:19:28,121 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:28,121 - DataManager - WARNING - Không thể lấy dữ liệu cho EURUSD D1: No data returned
+2025-10-02 17:19:28,121 - DataManager - INFO - Using synthetic data fallback for EURUSD D1
+2025-10-02 17:19:28,129 - DataManager - INFO - Generated 500 synthetic candles cho EURUSD D1
+2025-10-02 17:19:28,129 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:28,129 - DataManager - WARNING - Không thể lấy dữ liệu cho XAUUSD H1: No data returned
+2025-10-02 17:19:28,129 - DataManager - INFO - Using synthetic data fallback for XAUUSD H1
+2025-10-02 17:19:28,136 - DataManager - INFO - Generated 500 synthetic candles cho XAUUSD H1
+2025-10-02 17:19:28,137 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:28,137 - DataManager - WARNING - Không thể lấy dữ liệu cho BTCUSD H4: No data returned
+2025-10-02 17:19:28,137 - DataManager - INFO - Using synthetic data fallback for BTCUSD H4
+2025-10-02 17:19:28,144 - DataManager - INFO - Generated 500 synthetic candles cho BTCUSD H4
+2025-10-02 17:19:28,144 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:28,144 - DataManager - WARNING - Không thể lấy dữ liệu cho NAS100 M15: No data returned
+2025-10-02 17:19:28,144 - DataManager - INFO - Using synthetic data fallback for NAS100 M15
+2025-10-02 17:19:28,152 - DataManager - INFO - Generated 500 synthetic candles cho NAS100 M15
+2025-10-02 17:19:28,152 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:28,153 - DataManager - WARNING - Không thể lấy dữ liệu cho BTCUSD M15: No data returned
+2025-10-02 17:19:28,153 - DataManager - INFO - Using synthetic data fallback for BTCUSD M15
+2025-10-02 17:19:28,160 - DataManager - INFO - Generated 500 synthetic candles cho BTCUSD M15
+2025-10-02 17:19:28,161 - BotCore - WARNING - API oanda trả về status 401
+2025-10-02 17:19:28,161 - DataManager - WARNING - Không thể lấy dữ liệu cho EURUSD H1: No data returned
+2025-10-02 17:19:28,161 - DataManager - INFO - Using synthetic data fallback for EURUSD H1
+2025-10-02 17:19:28,169 - DataManager - INFO - Generated 500 synthetic candles cho EURUSD H1
+2025-10-02 17:19:28,170 - BotCore - INFO - 📊 Market data fetched for 4 symbols
+2025-10-02 17:19:28,260 - FeatureEngineer - INFO - Đã tính toán 57 features cho XAUUSD
+2025-10-02 17:19:28,347 - FeatureEngineer - INFO - Đã tính toán 57 features cho EURUSD
+2025-10-02 17:19:28,434 - FeatureEngineer - INFO - Đã tính toán 57 features cho NAS100
+2025-10-02 17:19:28,520 - FeatureEngineer - INFO - Đã tính toán 57 features cho BTCUSD
+2025-10-02 17:19:28,520 - MasterAgent - INFO - 🧠 Master Agent đang phân tích tổng thể thị trường...
+2025-10-02 17:19:28,520 - MasterAgent - INFO - 🤖 Master Agent đang phân tích XAUUSD...
+2025-10-02 17:19:28,520 - BotCore - ERROR - Lỗi API call marketaux: Session is closed
+2025-10-02 17:19:28,520 - BotCore - ERROR - Lỗi API call marketaux: Session is closed
+2025-10-02 17:19:28,520 - BotCore - ERROR - Lỗi API call marketaux: Session is closed
+2025-10-02 17:19:28,520 - BotCore - ERROR - Lỗi API call newsapi: Session is closed
+2025-10-02 17:19:28,520 - BotCore - ERROR - Lỗi API call newsapi: Session is closed
+2025-10-02 17:19:28,520 - BotCore - ERROR - Lỗi API call newsapi: Session is closed
+2025-10-02 17:19:28,520 - NewsManager - INFO - Có 0 tin tức cho XAUUSD, sentiment: 0.00
+2025-10-02 17:19:28,521 - MasterAgent - INFO - ✅ Master Agent quyết định: HOLD XAUUSD với confidence 0.00
+2025-10-02 17:19:28,521 - MasterAgent - INFO - 📊 XAUUSD: HOLD (confidence: 0.00)
+2025-10-02 17:19:28,521 - MasterAgent - INFO - 🤖 Master Agent đang phân tích EURUSD...
+2025-10-02 17:19:28,521 - BotCore - ERROR - Lỗi API call finnhub: Session is closed
+2025-10-02 17:19:28,521 - BotCore - ERROR - Lỗi API call finnhub: Session is closed
+2025-10-02 17:19:28,521 - BotCore - ERROR - Lỗi API call finnhub: Session is closed
+2025-10-02 17:19:28,521 - BotCore - ERROR - Lỗi API call marketaux: Session is closed
+2025-10-02 17:19:28,521 - BotCore - ERROR - Lỗi API call marketaux: Session is closed
+2025-10-02 17:19:28,521 - BotCore - ERROR - Lỗi API call marketaux: Session is closed
+2025-10-02 17:19:28,521 - BotCore - ERROR - Lỗi API call newsapi: Session is closed
+2025-10-02 17:19:28,521 - BotCore - ERROR - Lỗi API call newsapi: Session is closed
+2025-10-02 17:19:28,521 - BotCore - ERROR - Lỗi API call newsapi: Session is closed
+2025-10-02 17:19:28,521 - NewsManager - INFO - Có 0 tin tức cho EURUSD, sentiment: 0.00
+2025-10-02 17:19:28,521 - MasterAgent - INFO - ✅ Master Agent quyết định: HOLD EURUSD với confidence 0.00
+2025-10-02 17:19:28,521 - MasterAgent - INFO - 📊 EURUSD: HOLD (confidence: 0.00)
+2025-10-02 17:19:28,521 - MasterAgent - INFO - 🤖 Master Agent đang phân tích NAS100...
+2025-10-02 17:19:28,521 - BotCore - ERROR - Lỗi API call finnhub: Session is closed
+2025-10-02 17:19:28,521 - BotCore - ERROR - Lỗi API call finnhub: Session is closed
+2025-10-02 17:19:28,521 - BotCore - ERROR - Lỗi API call finnhub: Session is closed
+2025-10-02 17:19:28,521 - BotCore - ERROR - Lỗi API call marketaux: Session is closed
+2025-10-02 17:19:28,521 - BotCore - ERROR - Lỗi API call marketaux: Session is closed
+2025-10-02 17:19:28,521 - BotCore - ERROR - Lỗi API call marketaux: Session is closed
+2025-10-02 17:19:28,521 - BotCore - ERROR - Lỗi API call newsapi: Session is closed
+2025-10-02 17:19:28,521 - BotCore - ERROR - Lỗi API call newsapi: Session is closed
+2025-10-02 17:19:28,521 - BotCore - ERROR - Lỗi API call newsapi: Session is closed
+2025-10-02 17:19:28,521 - NewsManager - INFO - Có 0 tin tức cho NAS100, sentiment: 0.00
+2025-10-02 17:19:28,521 - MasterAgent - INFO - ✅ Master Agent quyết định: HOLD NAS100 với confidence 0.00
+2025-10-02 17:19:28,521 - MasterAgent - INFO - 📊 NAS100: HOLD (confidence: 0.00)
+2025-10-02 17:19:28,521 - MasterAgent - INFO - 🤖 Master Agent đang phân tích BTCUSD...
+2025-10-02 17:19:28,521 - BotCore - ERROR - Lỗi API call marketaux: Session is closed
+2025-10-02 17:19:28,521 - BotCore - ERROR - Lỗi API call marketaux: Session is closed
+2025-10-02 17:19:28,522 - BotCore - ERROR - Lỗi API call marketaux: Session is closed
+2025-10-02 17:19:28,522 - BotCore - ERROR - Lỗi API call newsapi: Session is closed
+2025-10-02 17:19:28,522 - BotCore - ERROR - Lỗi API call newsapi: Session is closed
+2025-10-02 17:19:28,522 - BotCore - ERROR - Lỗi API call newsapi: Session is closed
+2025-10-02 17:19:28,522 - NewsManager - INFO - Có 0 tin tức cho BTCUSD, sentiment: 0.00
+2025-10-02 17:19:28,522 - MasterAgent - INFO - ✅ Master Agent quyết định: HOLD BTCUSD với confidence 0.00
+2025-10-02 17:19:28,522 - MasterAgent - INFO - 📊 BTCUSD: HOLD (confidence: 0.00)
+2025-10-02 17:19:28,522 - MasterAgent - INFO - 🎯 Quyết định tổng thể: NEUTRAL (signal_strength: 0.50, confidence: 0.00)
+2025-10-02 17:19:28,523 - AutoRetrainManager - ERROR - Lỗi cập nhật online model cho XAUUSD: 'numpy.ndarray' object has no attribute 'items'
+2025-10-02 17:19:28,524 - AutoRetrainManager - ERROR - Lỗi cập nhật online model cho EURUSD: 'numpy.ndarray' object has no attribute 'items'
+2025-10-02 17:19:28,524 - AutoRetrainManager - ERROR - Lỗi cập nhật online model cho NAS100: 'numpy.ndarray' object has no attribute 'items'
+2025-10-02 17:19:28,525 - AutoRetrainManager - ERROR - Lỗi cập nhật online model cho BTCUSD: 'numpy.ndarray' object has no attribute 'items'
+2025-10-02 17:19:28,525 - BotCore - INFO - 📈 Models updated with new data
+2025-10-02 17:19:29,320 - Discord - INFO - Discord notification sent successfully
+2025-10-02 17:19:30,322 - BotCore - INFO - 📊 Performance report sent
+2025-10-02 17:19:30,322 - BotCore - INFO - ✅ Trading cycle #1 completed in 6.14s
