@@ -35,6 +35,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, accuracy_score
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.model_selection import TimeSeriesSplit
+from sklearn.preprocessing import MinMaxScaler
 import xgboost as xgb
 import lightgbm as lgb
 import optuna
@@ -1404,19 +1405,45 @@ class EnsembleModel:
                 elif model_name == 'random_forest':
                     model = RandomForestClassifier(**params)
                 
-                # Calibrate probabilities
-                calibrated_model = CalibratedClassifierCV(model, method='sigmoid', cv=3)
-                calibrated_model.fit(X_train, y_train)
+                # Calibrate probabilities with error handling
+                try:
+                    calibrated_model = CalibratedClassifierCV(model, method='sigmoid', cv=3)
+                    calibrated_model.fit(X_train, y_train)
+                    
+                    # Verify calibration was successful
+                    if not hasattr(calibrated_model, 'estimator_') or calibrated_model.estimator_ is None:
+                        raise ValueError("Calibration failed - no estimator found")
+                    
+                    self.logger.info(f"Sử dụng calibrated model cho {model_name}")
+                except Exception as calib_error:
+                    self.logger.warning(f"Calibration failed for {model_name}: {calib_error}")
+                    self.logger.info(f"Sử dụng model gốc cho {model_name}")
+                    # Fallback to original model
+                    calibrated_model = model
+                    calibrated_model.fit(X_train, y_train)
                 
                 self.models[model_name] = calibrated_model
                 
                 # Get predictions for meta-model
-                predictions = calibrated_model.predict_proba(X_train)[:, 1]
+                if hasattr(calibrated_model, 'predict_proba'):
+                    predictions = calibrated_model.predict_proba(X_train)[:, 1]
+                else:
+                    predictions = calibrated_model.decision_function(X_train)
+                    # Convert to probabilities
+                    scaler = MinMaxScaler()
+                    predictions = scaler.fit_transform(predictions.reshape(-1, 1)).flatten()
+                
                 base_predictions[:, i] = predictions
                 
                 # Calculate feature importance
-                if hasattr(calibrated_model.estimator_, 'feature_importances_'):
-                    self.feature_importance[model_name] = calibrated_model.estimator_.feature_importances_
+                estimator_to_check = None
+                if hasattr(calibrated_model, 'estimator_') and calibrated_model.estimator_ is not None:
+                    estimator_to_check = calibrated_model.estimator_
+                else:
+                    estimator_to_check = calibrated_model
+                
+                if hasattr(estimator_to_check, 'feature_importances_'):
+                    self.feature_importance[model_name] = estimator_to_check.feature_importances_
                 
                 self.logger.info(f"Hoàn thành training {model_name}")
                 
@@ -1446,17 +1473,46 @@ class EnsembleModel:
             base_predictions = np.zeros((len(X_train_fold), len(self.models)))
             
             for i, (name, model) in enumerate(self.models.items()):
-                model.fit(X_train_fold, y_train_fold)
-                temp_ensemble.models[name] = model
-                base_predictions[:, i] = model.predict_proba(X_train_fold)[:, 1]
+                try:
+                    # Create a fresh instance of the model for CV
+                    if name == 'xgboost':
+                        fresh_model = xgb.XGBClassifier(**self.model_configs[name])
+                    elif name == 'lightgbm':
+                        fresh_model = lgb.LGBMClassifier(**self.model_configs[name])
+                    elif name == 'random_forest':
+                        fresh_model = RandomForestClassifier(**self.model_configs[name])
+                    
+                    fresh_model.fit(X_train_fold, y_train_fold)
+                    temp_ensemble.models[name] = fresh_model
+                    
+                    if hasattr(fresh_model, 'predict_proba'):
+                        base_predictions[:, i] = fresh_model.predict_proba(X_train_fold)[:, 1]
+                    else:
+                        predictions = fresh_model.decision_function(X_train_fold)
+                        scaler = MinMaxScaler()
+                        predictions = scaler.fit_transform(predictions.reshape(-1, 1)).flatten()
+                        base_predictions[:, i] = predictions
+                except Exception as e:
+                    self.logger.error(f"Error training {name} in CV fold: {e}")
+                    base_predictions[:, i] = 0.5  # Default probability
             
             temp_meta = LogisticRegression()
             temp_meta.fit(base_predictions, y_train_fold)
             
             #Predict on validation set
-            val_base_predictions = np.zeros((len(X_val_fold), len(self.models)))
+            val_base_predictions = np.zeros((len(X_val_fold), len(temp_ensemble.models)))
             for i, (name, model) in enumerate(temp_ensemble.models.items()):
-                val_base_predictions[:, i] = model.predict_proba(X_val_fold)[:, 1]
+                try:
+                    if hasattr(model, 'predict_proba'):
+                        val_base_predictions[:, i] = model.predict_proba(X_val_fold)[:, 1]
+                    else:
+                        predictions = model.decision_function(X_val_fold)
+                        scaler = MinMaxScaler()
+                        predictions = scaler.fit_transform(predictions.reshape(-1, 1)).flatten()
+                        val_base_predictions[:, i] = predictions
+                except Exception as e:
+                    self.logger.error(f"Error predicting with {name} in CV validation: {e}")
+                    val_base_predictions[:, i] = 0.5  # Default probability
             
             val_predictions = temp_meta.predict(val_base_predictions)
             
@@ -1482,7 +1538,22 @@ class EnsembleModel:
         base_predictions = np.zeros((len(X), len(self.models)))
         
         for i, (name, model) in enumerate(self.models.items()):
-            base_predictions[:, i] = model.predict_proba(X)[:, 1]
+            try:
+                if hasattr(model, 'predict_proba'):
+                    base_predictions[:, i] = model.predict_proba(X)[:, 1]
+                else:
+                    # Fallback to decision function if predict_proba is not available
+                    predictions = model.decision_function(X)
+                    scaler = MinMaxScaler()
+                    predictions = scaler.fit_transform(predictions.reshape(-1, 1)).flatten()
+                    base_predictions[:, i] = predictions
+            except Exception as e:
+                self.logger.error(f"Error predicting with {name}: {e}")
+                # Use average of other models as fallback
+                if i > 0:
+                    base_predictions[:, i] = np.mean(base_predictions[:, :i], axis=1)
+                else:
+                    base_predictions[:, i] = 0.5  # Default probability
         
         # Meta-model prediction
         meta_predictions = self.meta_model.predict_proba(base_predictions)
