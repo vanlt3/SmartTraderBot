@@ -2673,19 +2673,38 @@ class AdvancedRiskManager:
         """Calculate current portfolio metrics"""
         
         total_open_pnl = 0
+        total_unrealized_pnl = 0
         for symbol, position in self.open_positions.items():
             if position.get('status') == 'open':
                 # Simple current P&L calculation (would need current price in real implementation)
                 entry_price = position.get('entry_price', 0)
-                pnl = (1 - entry_price) * position.get('position_size', 0)  # Simplified
-                total_open_pnl += pnl
+                current_price = position.get('current_price', entry_price)
+                position_size = position.get('position_size', 0)
+                
+                # Calculate P&L based on position type
+                if position.get('side') == 'buy':
+                    unrealized_pnl = (current_price - entry_price) * position_size
+                else:  # sell
+                    unrealized_pnl = (entry_price - current_price) * position_size
+                
+                total_open_pnl += unrealized_pnl
+                total_unrealized_pnl += unrealized_pnl
+        
+        # Calculate max drawdown (simplified)
+        current_value = self.portfolio_value + total_open_pnl
+        if not hasattr(self, '_peak_value') or current_value > self._peak_value:
+            self._peak_value = current_value
+        
+        max_drawdown = (self._peak_value - current_value) / self._peak_value if self._peak_value > 0 else 0
         
         return {
-            'total_value': self.portfolio_value + total_open_pnl,
+            'total_value': current_value,
+            'total_pnl': total_open_pnl,  # Add missing total_pnl key
             'cash_balance': self.cash_balance,
-            'open_positions': len(self.open_positions),
+            'open_positions': len([p for p in self.open_positions.values() if p.get('status') == 'open']),
             'total_exposure': self._calculate_portfolio_exposure(),
-            'unrealized_pnl': total_open_pnl
+            'unrealized_pnl': total_unrealized_pnl,
+            'max_drawdown': max_drawdown
         }
     
     def _calculate_portfolio_exposure(self) -> float:
