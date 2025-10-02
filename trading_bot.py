@@ -93,16 +93,16 @@ class Config:
     SYMBOLS = ["XAUUSD", "EURUSD", "NAS100", "BTCUSD"]
     SYMBOL_MAPPING = {
         "NAS100": "NAS100_USD", 
-        "EURUSD": "EURUSD",
-        "XAUUSD": "XAU_USD",  # OANDA gold symbol
-        "BTCUSD": "BTC"       # OANDA Bitcoin symbol - cần check lại API docs
+        "EURUSD": "EUR_USD",   # OANDA USD symbol - đúng định dạng BASE_QUOTE
+        "XAUUSD": "XAU_USD",   # OANDA gold symbol - đúng định dạng BASE_QUOTE
+        "BTCUSD": "BTC_USD"    # OANDA Bitcoin symbol - đúng định dạng BASE_QUOTE
     }
     # Alternative mappings for different brokers/APIs
     ALTERNATIVE_SYMBOLS = {
-        "XAUUSD": ["XAUUSD", "GOLD", "XAU_USD"],
-        "BTCUSD": ["BTCUSD", "BTC", "BITCOIN"],
-        "EURUSD": ["EURUSD", "EUR_USD"],
-        "NAS100": ["NAS100", "NAS100_USD", "NAS_USD"]
+        "XAUUSD": ["XAU_USD", "XAUUSD", "GOLD"],
+        "BTCUSD": ["BTC_USD", "BTCUSD", "BTC"],
+        "EURUSD": ["EUR_USD", "EURUSD"],
+        "NAS100": ["NAS100_USD", "NAS100", "NAS_USD"]
     }
     
     # Risk Management
