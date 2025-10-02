@@ -18,8 +18,8 @@ optuna>=3.0.0
 # Deep Learning
 tensorflow>=2.10.0
 
-# Reinforcement Learning
-gym>=0.21.0
+# Reinforcement Learning  
+gymnasium>=1.0.0  # Updated version with NumPy 2.0 support
 stable-baselines3>=1.6.0
 
 # Technical Analysis

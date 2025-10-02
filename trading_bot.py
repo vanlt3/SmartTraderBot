@@ -47,8 +47,8 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 
 # Reinforcement Learning
-import gym
-from gym import spaces
+import gymnasium as gym
+from gymnasium import spaces
 import stable_baselines3
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
@@ -74,11 +74,15 @@ sys.stdout.reconfigure(encoding='utf-8')
 
 # ===== CẤU HÌNH API VÀ CONSTANTS =====
 class Config:
-    """Quản lý cấu hình toàn cục"""
+    """Quản lý cấu hình toàn cục
+    
+    NOTE: API Keys below may be expired/invalid for demo purposes.
+    For production use, replace with valid API keys from respective services.
+    """
     
     # API Keys
     ALPHA_VANTAGE_API_KEY = "FK3YQ1IKSC4E1AL5"
-    FINNHUB_API_KEY = "d1b3ichr01qjhvtsbj8g"
+    FINNHUB_API_KEY = "YOUR_VALID_FINNHUB_KEY_HERE"  # Invalid - replace with real key
     MARKETAUX_API_KEY = "CkuQmx9sPsjw0FRDeSkoO8U3O9Jj3HWnUYMJNEql"
     NEWSAPI_API_KEY = "abd8f43b808f42fdb8d28fb1c429af72"
     EODHD_API_KEY = "68bafd7d44a7f0.25202650"
@@ -1034,18 +1038,33 @@ class NewsEconomicManager:
             all_news = []
             for result in results:
                 if isinstance(result, list):
-                    all_news.extend(result)
+                    # Handle MarketAux direct list results
+                    for article in result:
+                        # MarketAux structure: title, description  
+                        title = article.get('title', '')
+                        description = article.get('description', '')
+                        if title or description:
+                            all_news.append({'text': f"{title} {description}".strip()})
                 elif isinstance(result, dict) and 'articles' in result:
+                    # Handle NewsAPI structure
                     for article in result['articles']:
                         title = article.get('title', '')
                         description = article.get('description', '')
-                        all_news.append({'text': f"{title} {description}"})
+                        if title or description:
+                            all_news.append({'text': f"{title} {description}".strip()})
+                elif isinstance(result, dict):
+                    # Handle FinnHub structure (headline, summary)
+                    title = result.get('headline', '')
+                    summary = result.get('summary', '')
+                    if title or summary:
+                        all_news.append({'text': f"{title} {summary}".strip()})
             
             # Phân tích sentiment cho mỗi tin
             if all_news:
                 sentiment_scores = []
                 for news_item in all_news[:10]:  # Giới hạn 10 tin mới nhất
-                    text = news_item['text']
+                    # Safely access text field with error handling
+                    text = news_item.get('text', '')
                     if len(text.strip()) > 10:  # Chỉ phân tích nếu có đủ text
                         sentiment = await self.sentiment_analyzer.analyze_sentiment(text)
                         sentiment_scores.append(sentiment)
@@ -1070,18 +1089,10 @@ class NewsEconomicManager:
         return news_data
     
     async def _fetch_finnhub_news(self, symbol: str) -> List[Dict]:
-        """Fetch news từ Finnhub"""
-        url = "https://finnhub.io/api/v1/company-news"
-        params = {
-            'symbol': symbol,
-            'from': (datetime.now() - timedelta(hours=24)).strftime('%Y-%m-%d'),
-            'to': datetime.now().strftime('%Y-%m-%d'),
-            'token': Config.FINNHUB_API_KEY
-        }
-        
-        data = await self.api_manager._make_request(url, params=params, api_name='finnhub')
-        if data:
-            return data[:5]  # Top 5 news
+        """Fetch news từ Finnhub - Skip FinnHub due to invalid API key for now"""
+        # Skip FinnHub due to invalid API key (returns 401)
+        # Return empty list to avoid crashes
+        self.logger.warning(f"Skipping FinnHub news for {symbol} due to invalid API key")
         return []
     
     async def _fetch_marketaux_news(self, symbol: str) -> List[Dict]:
