@@ -1341,8 +1341,8 @@ class EnsembleModel:
                 base_predictions[:, i] = predictions
                 
                 # Calculate feature importance
-                if hasattr(calibrated_model.base_estimator, 'feature_importances_'):
-                    self.feature_importance[model_name] = calibrated_model.base_estimator.feature_importances_
+                if hasattr(calibrated_model.estimator_, 'feature_importances_'):
+                    self.feature_importance[model_name] = calibrated_model.estimator_.feature_importances_
                 
                 self.logger.info(f"Hoàn thành training {model_name}")
                 
@@ -1419,18 +1419,19 @@ class EnsembleModel:
 class LSTMModel:
     """LSTM Model với Attention mechanism"""
     
-    def __init__(self, sequence_length: int = 50, feature_dim: int = 50):
+    def __init__(self, sequence_length: int = 50, feature_dim: int = None):
         self.sequence_length = sequence_length
-        self.feature_dim = feature_dim
+        self.feature_dim = feature_dim  # Will be determined from data
         self.model = None
         self.logger = LOG_MANAGER.get_logger('EnsembleModel')
         self.is_trained = False
-        
-        # Build model architecture
-        self._build_model()
+        self.scaler = None
     
     def _build_model(self):
         """Xây dựng kiến trúc LSTM với Attention"""
+        
+        if self.feature_dim is None:
+            raise ValueError("Feature dimension must be set before building model")
         
         # Input layer
         inputs = Input(shape=(self.sequence_length, self.feature_dim), name='input_sequences')
@@ -1479,10 +1480,19 @@ class LSTMModel:
     def prepare_sequences(self, X: pd.DataFrame, y: pd.Series) -> Tuple[np.ndarray, np.ndarray]:
         """Chuẩn bị data thành sequences cho LSTM"""
         
+        # Determine feature dimension from data if not set
+        if self.feature_dim is None:
+            self.feature_dim = X.shape[1]
+            self.logger.info(f"LSTM feature dimension set to {self.feature_dim}")
+        
         # Scale features
         scaler = sklearn.preprocessing.StandardScaler()
         X_scaled = scaler.fit_transform(X)
         self.scaler = scaler
+        
+        # Build model with correct feature dimension
+        if self.model is None:
+            self._build_model()
         
         # Create sequences
         X_sequences = []
@@ -1490,7 +1500,8 @@ class LSTMModel:
         
         for i in range(self.sequence_length, len(X_scaled)):
             X_sequences.append(X_scaled[i-self.sequence_length:i])
-            y_sequences.append(y.iloc[i])
+            if i < len(y):  # Check bounds to prevent index error
+                y_sequences.append(y.iloc[i])
         
         return np.array(X_sequences), np.array(y_sequences)
     
