@@ -10,8 +10,7 @@ import os
 # Add the current directory to Python path
 sys.path.insert(0, os.getcwd())
 
-from trading_bot import Config, DataManager
-from trading_bot import logger
+from trading_bot import Config, EnhancedDataManager
 
 
 async def test_symbol_fetch():
@@ -20,8 +19,10 @@ async def test_symbol_fetch():
     print("🚀 Test Symbol Fetch...")
     print("=" * 50)
     
-    # Initialize DataManager
-    dm = DataManager()
+    # Initialize EnhancedDataManager  
+    from trading_bot import APIManager
+    api_manager = APIManager()
+    dm = EnhancedDataManager(api_manager)
     
     # Test each symbol for H1 timeframe (đủ để test compatibility)
     test_results = {}
@@ -81,5 +82,5 @@ async def test_symbol_fetch():
     return len(successful_symbols)
 
 
-if __name__ == __main__":
+if __name__ == "__main__":
     asyncio.run(test_symbol_fetch())
