@@ -1822,7 +1822,7 @@ class NewsSpecialistAgent:
                 'sentiment': sentiment,
                 'confidence': confidence,
                 'impact': impact,
-                'news_count': len(news_data['articles']),
+                'news_count': len(news_data['latest_news_items']),
                 'timestamp': datetime.now().isoformat()
             }
             
@@ -2252,6 +2252,9 @@ class OnlineLearningManager:
             features_dict = self._numpy_to_dict(features)
             
             # Preprocess features
+            if model_info['preprocessor'] is None:
+                self.logger.warning(f"Preprocessor is None for {symbol}, skipping model update")
+                return
             scaled_features = model_info['preprocessor'].learn_one(features_dict).transform_one(features_dict)
             
             # Update anomaly detector
@@ -2287,6 +2290,9 @@ class OnlineLearningManager:
             
             # Convert numpy array to dict for River framework
             features_dict = self._numpy_to_dict(features)
+            if model_info['preprocessor'] is None:
+                self.logger.warning(f"Preprocessor is None for {symbol}, returning default prediction")
+                return 0.0
             scaled_features = model_info['preprocessor'].transform_one(features_dict)
             
             prediction = model_info['linear_model'].predict_one(scaled_features)
@@ -2306,6 +2312,9 @@ class OnlineLearningManager:
                 return False
             
             model_info = self.online_models[symbol]
+            if model_info['preprocessor'] is None:
+                self.logger.warning(f"Preprocessor is None for {symbol}, returning no anomaly")
+                return False
             scaled_features = model_info['preprocessor'].transform_one(features)
             
             # Check if current data is anomaly
