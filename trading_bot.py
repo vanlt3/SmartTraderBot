@@ -97,15 +97,15 @@ class Config:
     SYMBOLS = ["XAUUSD", "EURUSD", "NAS100", "BTCUSD"]
     SYMBOL_MAPPING = {
         "NAS100": "NAS100_USD", 
-        "EURUSD": "EUR_USD",   # OANDA USD symbol - đúng định dạng BASE_QUOTE
-        "XAUUSD": "XAU_USD",   # OANDA gold symbol - đúng định dạng BASE_QUOTE
-        "BTCUSD": "BTC_USD"    # OANDA Bitcoin symbol - đúng định dạng BASE_QUOTE
+        "EURUSD": "EUR_USD",   # Try EUR_USD first
+        "XAUUSD": "XAU_USD",   # OANDA gold symbol 
+        "BTCUSD": "BTC_USD"    # OANDA Bitcoin symbol
     }
     # Alternative mappings for different brokers/APIs
     ALTERNATIVE_SYMBOLS = {
         "XAUUSD": ["XAU_USD", "XAUUSD", "GOLD"],
         "BTCUSD": ["BTC_USD", "BTCUSD", "BTC"],
-        "EURUSD": ["EUR_USD", "EURUSD"],
+        "EURUSD": ["EUR_USD", "EURUSD", "USDEUR"],  # Try both formats
         "NAS100": ["NAS100_USD", "NAS100", "NAS_USD"]
     }
     
@@ -282,7 +282,7 @@ class APIManager:
         
         # Rate limit settings (requests per minute)
         self.rate_limit_config = {
-            'oanda': 100,
+            'oanda': 30,  # Reduced from 100 to be more conservative
             'finnhub': 60,
             'newsapi': 1000,
             'alpha_vantage': 5
@@ -348,7 +348,10 @@ class APIManager:
         
         # Kiểm tra rate limit
         if not self._check_rate_limit(api_name):
-            self.logger.warning(f"Rate limit cho {api_name}, chờ thêm thời gian...")
+            limit_info = self.rate_limits.get(api_name, {})
+            wait_time = limit_info.get('next_allowed', 0) - time.time()
+            if wait_time > 0:
+                self.logger.warning(f"Rate limit cho {api_name}, chờ {wait_time:.1f}s...")
             return None
         
         start_time = time.time()
@@ -3787,28 +3790,22 @@ class TradingBotController:
         market_data = {}
         
         async with self.api_manager:
-            tasks = []
-            for symbol in Config.SYMBOLS:
-                for timeframe in Config.TIME_FRAMES:
-                    tasks.append(self.data_manager.get_fresh_data(symbol, timeframe))
-            
-            # Fetch all data in parallel
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            
-            idx = 0
+            # Fetch data sequentially to avoid rate limiting
             for symbol in Config.SYMBOLS:
                 symbol_data = {}
-                
                 for timeframe in Config.TIME_FRAMES:
-                    if idx < len(results):
-                        result = results[idx]
-                        if isinstance(result, pd.DataFrame) and not result.empty:
-                            symbol_data[timeframe.lower()] = result
-                        idx += 1
+                    try:
+                        # Add delay between requests to respect rate limits
+                        await asyncio.sleep(0.5)  # Increased from 0.1s to 0.5s
+                        df = await self.data_manager.get_fresh_data(symbol, timeframe)
+                        if df is not None:
+                            symbol_data[timeframe] = df
+                    except Exception as e:
+                        self.logger.warning(f"Failed to fetch {symbol} {timeframe}: {e}")
+                        continue
                 
                 if symbol_data:
-                    # Use H1 as primary timeframe
-                    market_data[symbol] = symbol_data.get('h1', pd.DataFrame())
+                    market_data[symbol] = symbol_data
             
             self.last_data_fetch = datetime.now()
             self.logger.info(f"📊 Market data fetched for {len(market_data)} symbols")
