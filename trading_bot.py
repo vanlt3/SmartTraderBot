@@ -4083,9 +4083,9 @@ class TradingBotController:
                                 # Normalize datetime columns for merging - handle timezone mismatch
                                 if 'datetime' in df_with_timeframe.columns:
                                     # Convert both datetime columns to UTC/naive for compatibility
-                                    if pd.api.types.is_datetime64tz_ns_dtype(combined_df['datetime']):
+                                    if isinstance(combined_df['datetime'].dtype, pd.DatetimeTZDtype):
                                         combined_df['datetime'] = combined_df['datetime'].dt.tz_localize(None)
-                                    if pd.api.types.is_datetime64tz_ns_dtype(df_with_timeframe['datetime']):
+                                    if isinstance(df_with_timeframe['datetime'].dtype, pd.DatetimeTZDtype):
                                         df_with_timeframe['datetime'] = df_with_timeframe['datetime'].dt.tz_localize(None)
                                     
                                     # Ensure both datetime columns are the same type
