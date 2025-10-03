@@ -1433,33 +1433,65 @@ class EnsembleModel:
     def train_ensemble(self, X_train: pd.DataFrame, y_train: pd.Series) -> Dict[str, float]:
         """Huấn luyện ensemble models với optimized parameters"""
         
-        # Store feature names for consistency during prediction
-        self.feature_names = list(X_train.columns)
-        self.logger.info(f"EnsembleModel storing feature names: {self.feature_names}")
-        
-        # Tối ưu hóa từng model
-        optimized_params = {}
-        
-        for model_name in ['xgboost', 'lightgbm', 'random_forest']:
-            try:
-                params = self.optimize_hyperparameters(X_train, y_train, model_name)
-                optimized_params[model_name] = params
-                self.logger.info(f"Hoàn thành optimization cho {model_name}")
-            except Exception as e:
-                self.logger.error(f"Lỗi optimization {model_name}: {e}")
-                optimized_params[model_name] = self.model_configs[model_name]
-        
-        # Train models với optimized parameters
-        base_predictions = np.zeros((len(X_train), len(optimized_params)))
-        
-        for i, (model_name, params) in enumerate(optimized_params.items()):
-            try:
-                if model_name == 'xgboost':
-                    model = xgb.XGBClassifier(**params)
-                elif model_name == 'lightgbm':
-                    model = lgb.LGBMClassifier(**params)
-                elif model_name == 'random_forest':
-                    model = RandomForestClassifier(**params)
+        try:
+            # Validate input data
+            if X_train.empty or y_train.empty:
+                self.logger.error("Empty training data provided")
+                return {'error': 'Empty training data'}
+            
+            if len(X_train) != len(y_train):
+                self.logger.error(f"Feature and target length mismatch: {len(X_train)} vs {len(y_train)}")
+                return {'error': 'Data length mismatch'}
+            
+            if len(X_train) < 10:
+                self.logger.error(f"Insufficient training data: {len(X_train)} samples")
+                return {'error': 'Insufficient training data'}
+            
+            # Store feature names for consistency during prediction
+            self.feature_names = list(X_train.columns)
+            self.logger.info(f"EnsembleModel storing feature names: {self.feature_names}")
+            self.logger.info(f"Training ensemble with {len(X_train)} samples, {len(self.feature_names)} features")
+            
+            # Use default parameters instead of optimization for faster training
+            optimized_params = {}
+            for model_name in ['xgboost', 'lightgbm', 'random_forest']:
+                try:
+                    # Use default parameters for faster training
+                    optimized_params[model_name] = self.model_configs[model_name]
+                    self.logger.info(f"Using default parameters for {model_name}")
+                except Exception as e:
+                    self.logger.error(f"Lỗi getting parameters {model_name}: {e}")
+                    optimized_params[model_name] = self.model_configs[model_name]
+            
+            # Train models với optimized parameters
+            base_predictions = np.zeros((len(X_train), len(optimized_params)))
+            
+            for i, (model_name, params) in enumerate(optimized_params.items()):
+                try:
+                    self.logger.info(f"Training {model_name} model...")
+                    if model_name == 'xgboost':
+                        model = xgb.XGBClassifier(**params)
+                    elif model_name == 'lightgbm':
+                        model = lgb.LGBMClassifier(**params)
+                    elif model_name == 'random_forest':
+                        model = RandomForestClassifier(**params)
+                    
+                    # Train model
+                    model.fit(X_train, y_train)
+                    
+                    # Get predictions
+                    pred_proba = model.predict_proba(X_train)[:, 1]
+                    base_predictions[:, i] = pred_proba
+                    
+                    # Store trained model
+                    self.models[model_name] = model
+                    self.logger.info(f"✅ {model_name} model trained successfully")
+                    
+                except Exception as e:
+                    self.logger.error(f"Failed to train {model_name}: {e}")
+                    # Fill with zeros if training fails
+                    base_predictions[:, i] = 0.5
+                    continue
                 
                 # Calibrate probabilities with error handling
                 try:
@@ -1502,16 +1534,17 @@ class EnsembleModel:
                     self.feature_importance[model_name] = estimator_to_check.feature_importances_
                 
                 self.logger.info(f"Hoàn thành training {model_name}")
-                
-            except Exception as e:
-                self.logger.error(f"Lỗi training {model_name}: {e}")
         
-        # Train meta-model (Logistic Regression)
-        self.meta_model = LogisticRegression()
-        self.meta_model.fit(base_predictions, y_train)
-        
-        self.logger.info("Hoàn thành ensemble training")
-        return self._evaluate_performance(X_train, y_train)
+            # Train meta-model (Logistic Regression)
+            self.meta_model = LogisticRegression()
+            self.meta_model.fit(base_predictions, y_train)
+            
+            self.logger.info("Hoàn thành ensemble training")
+            return self._evaluate_performance(X_train, y_train)
+            
+        except Exception as e:
+            self.logger.error(f"Ensemble training failed: {e}")
+            return {'error': f'Training failed: {str(e)}'}
     
     def _evaluate_performance(self, X: pd.DataFrame, y: pd.Series) -> Dict[str, float]:
         """Đánh giá performance của ensemble"""
@@ -1777,79 +1810,103 @@ class LSTMModel:
               validation_split: float = 0.2, epochs: int = 100) -> Dict[str, float]:
         """Huấn luyện LSTM model"""
         
-        # Prepare sequences
-        X_seq, y_seq = self.prepare_sequences(X, y)
-        
-        # Validate sequences
-        if len(X_seq) == 0:
-            self.logger.error("No sequences created from input data")
-            return {'error': 'Insufficient data for training'}
-        
-        if X_seq.shape[1] != self.sequence_length:
-            self.logger.error(f"Sequence length mismatch: expected {self.sequence_length}, got {X_seq.shape[1]}")
-            return {'error': 'Data preprocessing error'}
-        
-        # Validate tensor shapes
-        self.logger.info(f"Training data shapes: X_seq={X_seq.shape}, y_seq={y_seq.shape}")
-        
-        # Ensure y_seq has proper shape for binary classification
-        if y_seq.shape != (X_seq.shape[0], 1):
-            self.logger.warning(f"Reshaping y_seq from {y_seq.shape} to ({X_seq.shape[0]}, 1)")
-            y_seq = y_seq.reshape(X_seq.shape[0], 1)
-        
-        # Split data
-        split_idx = int(len(X_seq) * (1 - validation_split))
-        X_train_seq, X_val_seq = X_seq[:split_idx], X_seq[split_idx:]
-        y_train_seq, y_val_seq = y_seq[:split_idx], y_seq[split_idx:]
-        
-        # Callbacks
-        early_stopping = EarlyStopping(
-            monitor='val_loss',
-            patience=15,
-            restore_best_weights=True,
-            verbose=1
-        )
-        
-        reduce_lr = ReduceLROnPlateau(
-            monitor='val_loss',
-            factor=0.5,
-            patience=10,
-            min_lr=1e-7,
-            verbose=1
-        )
-        
-        # Train model
         try:
-            history = self.model.fit(
-                X_train_seq, y_train_seq,
-                validation_data=(X_val_seq, y_val_seq),
-                epochs=epochs,
-                batch_size=32,
-                callbacks=[early_stopping, reduce_lr],
+            # Validate input data
+            if X.empty or y.empty:
+                self.logger.error("Empty training data provided to LSTM")
+                return {'error': 'Empty training data'}
+            
+            if len(X) != len(y):
+                self.logger.error(f"LSTM feature and target length mismatch: {len(X)} vs {len(y)}")
+                return {'error': 'Data length mismatch'}
+            
+            if len(X) < self.sequence_length + 10:
+                self.logger.error(f"Insufficient training data for LSTM: {len(X)} samples (need at least {self.sequence_length + 10})")
+                return {'error': 'Insufficient training data'}
+            
+            self.logger.info(f"LSTM training with {len(X)} samples, {X.shape[1]} features")
+            
+            # Prepare sequences
+            X_seq, y_seq = self.prepare_sequences(X, y)
+            
+            # Validate sequences
+            if len(X_seq) == 0:
+                self.logger.error("No sequences created from input data")
+                return {'error': 'Insufficient data for training'}
+            
+            if X_seq.shape[1] != self.sequence_length:
+                self.logger.error(f"Sequence length mismatch: expected {self.sequence_length}, got {X_seq.shape[1]}")
+                return {'error': 'Data preprocessing error'}
+            
+            # Validate tensor shapes
+            self.logger.info(f"Training data shapes: X_seq={X_seq.shape}, y_seq={y_seq.shape}")
+            
+            # Ensure y_seq has proper shape for binary classification
+            if y_seq.shape != (X_seq.shape[0], 1):
+                self.logger.warning(f"Reshaping y_seq from {y_seq.shape} to ({X_seq.shape[0]}, 1)")
+                y_seq = y_seq.reshape(X_seq.shape[0], 1)
+            
+            # Split data
+            split_idx = int(len(X_seq) * (1 - validation_split))
+            X_train_seq, X_val_seq = X_seq[:split_idx], X_seq[split_idx:]
+            y_train_seq, y_val_seq = y_seq[:split_idx], y_seq[split_idx:]
+            
+            self.logger.info(f"Split data: train={len(X_train_seq)}, val={len(X_val_seq)}")
+            
+            # Callbacks
+            early_stopping = EarlyStopping(
+                monitor='val_loss',
+                patience=15,
+                restore_best_weights=True,
                 verbose=1
             )
+            
+            reduce_lr = ReduceLROnPlateau(
+                monitor='val_loss',
+                factor=0.5,
+                patience=10,
+                min_lr=1e-7,
+                verbose=1
+            )
+            
+            # Train model
+            try:
+                self.logger.info("Starting LSTM model training...")
+                history = self.model.fit(
+                    X_train_seq, y_train_seq,
+                    validation_data=(X_val_seq, y_val_seq),
+                    epochs=epochs,
+                    batch_size=32,
+                    callbacks=[early_stopping, reduce_lr],
+                    verbose=1
+                )
+                self.logger.info("✅ LSTM model training completed")
+            except Exception as e:
+                self.logger.error(f"Model training error: {e}")
+                return {'error': f'Training failed: {str(e)}'}
+            
+            self.is_trained = True
+            
+            # Evaluate
+            try:
+                val_loss, val_acc, val_prec, val_rec = self.model.evaluate(X_val_seq, y_val_seq, verbose=0)
+                
+                self.logger.info(f"LSTM Training completed - Val Acc: {val_acc:.3f}, Val Loss: {val_loss:.3f}")
+                
+                return {
+                    'training_completed': True,
+                    'val_accuracy': val_acc,
+                    'val_loss': val_loss,
+                    'val_precision': val_prec,
+                    'val_recall': val_rec
+                }
+            except Exception as e:
+                self.logger.warning(f"Evaluation failed: {e}")
+                return {'training_completed': True, 'evaluation_failed': str(e)}
+                
         except Exception as e:
-            self.logger.error(f"Model training error: {e}")
+            self.logger.error(f"LSTM training failed: {e}")
             return {'error': f'Training failed: {str(e)}'}
-        
-        self.is_trained = True
-        
-        # Evaluate
-        try:
-            val_loss, val_acc, val_prec, val_rec = self.model.evaluate(X_val_seq, y_val_seq, verbose=0)
-            
-            self.logger.info(f"LSTM Training completed - Val Acc: {val_acc:.3f}, Val Loss: {val_loss:.3f}")
-            
-            return {
-                'training_completed': True,
-                'val_accuracy': val_acc,
-                'val_loss': val_loss,
-                'val_precision': val_prec,
-                'val_recall': val_rec
-            }
-        except Exception as e:
-            self.logger.warning(f"Evaluation failed: {e}")
-            return {'training_completed': True, 'evaluation_failed': str(e)}
     
     def predict(self, X: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
         """Dự đoán với LSTM model"""
@@ -2687,45 +2744,74 @@ class MasterAgent:
             # Train Ensemble Model
             if self.ensemble_model and hasattr(self.ensemble_model, 'train_ensemble'):
                 try:
+                    self.logger.info("🎯 Starting Ensemble model training...")
                     ensemble_scores = self.ensemble_model.train_ensemble(features, labels)
                     training_results['ensemble'] = ensemble_scores
-                    self.logger.info(f"✅ Ensemble training completed - Accuracy: {ensemble_scores.get('accuracy', 0):.3f}")
+                    if 'error' in ensemble_scores:
+                        self.logger.error(f"❌ Ensemble training failed: {ensemble_scores['error']}")
+                    else:
+                        self.logger.info(f"✅ Ensemble training completed - Accuracy: {ensemble_scores.get('accuracy', 0):.3f}")
                 except Exception as e:
-                    self.logger.error(f"Ensemble training failed: {e}")
+                    self.logger.error(f"❌ Ensemble training failed: {e}")
                     training_results['ensemble'] = {'error': str(e)}
+            else:
+                self.logger.warning("⚠️ Ensemble model not available or missing train_ensemble method")
             
             # Train LSTM Model
             if self.lstm_model and hasattr(self.lstm_model, 'train'):
                 try:
+                    self.logger.info("🧠 Starting LSTM model training...")
                     lstm_scores = self.lstm_model.train(features, labels)
                     training_results['lstm'] = lstm_scores
-                    self.logger.info(f"✅ LSTM training completed - Validation Accuracy: {lstm_scores.get('val_accuracy', 0):.3f}")
+                    if 'error' in lstm_scores:
+                        self.logger.error(f"❌ LSTM training failed: {lstm_scores['error']}")
+                    else:
+                        self.logger.info(f"✅ LSTM training completed - Validation Accuracy: {lstm_scores.get('val_accuracy', 0):.3f}")
                 except Exception as e:
-                    self.logger.error(f"LSTM training failed: {e}")
+                    self.logger.error(f"❌ LSTM training failed: {e}")
                     training_results['lstm'] = {'error': str(e)}
+            else:
+                self.logger.warning("⚠️ LSTM model not available or missing train method")
             
             # Train RL Agent
             if self.rl_agent and self.rl_agent.model:
                 try:
-                    self.rl_agent.train(total_timesteps=50000)
-                    training_results['rl'] = {'status': 'trained', 'timesteps': 10000}
-                    self.logger.info("✅ RL Agent training completed")
+                    self.logger.info("🤖 Starting RL Agent training...")
+                    rl_result = self.rl_agent.train(total_timesteps=50000)
+                    training_results['rl'] = rl_result
+                    if 'error' in rl_result:
+                        self.logger.error(f"❌ RL training failed: {rl_result['error']}")
+                    else:
+                        self.logger.info("✅ RL Agent training completed")
                 except Exception as e:
-                    self.logger.error(f"RL training failed: {e}")
+                    self.logger.error(f"❌ RL training failed: {e}")
                     training_results['rl'] = {'error': str(e)}
+            else:
+                self.logger.warning("⚠️ RL Agent not available or model not created")
             
             # Cập nhật model weights nếu training thành công
             trained_models = [k for k, v in training_results.items() if 'error' not in str(v)]
+            failed_models = [k for k, v in training_results.items() if 'error' in str(v)]
+            
+            self.logger.info(f"📊 Training Summary:")
+            self.logger.info(f"   ✅ Successfully trained: {trained_models}")
+            self.logger.info(f"   ❌ Failed to train: {failed_models}")
+            
             if len(trained_models) >= 2:
                 # Boost confidence weight của các models trained
                 self.ensemble_weight = 0.5
                 self.lstm_weight = 0.4
                 self.expert_weight = 0.1
                 self.logger.info(f"🎯 Model weights updated after training: {trained_models}")
+            elif len(trained_models) >= 1:
+                self.logger.warning(f"⚠️ Only {len(trained_models)} model(s) trained successfully")
+            else:
+                self.logger.error("❌ No models trained successfully!")
             
             return {
-                'status': 'training_completed',
+                'status': 'success' if len(trained_models) > 0 else 'partial_failure',
                 'trained_models': trained_models,
+                'failed_models': failed_models,
                 'results': training_results,
                 'updated_weights': {
                     'ensemble': self.ensemble_weight,
@@ -2775,27 +2861,54 @@ class RLAgent:
     def train(self, total_timesteps: int = 100000) -> Dict[str, Any]:
         """Huấn luyện RL agent"""
         
-        if not self.model:
-            self.create_model()
-        
-        self.logger.info(f"Bắt đầu training RL agent trong {total_timesteps} steps")
-        
-        # Train model
-        with self.model.env.envs[0] as env:
-            self.model.learn(
-                total_timesteps=total_timesteps,
-                callback=TrainingCallback(),
-                progress_bar=True
-            )
-        
-        # Save model
-        self.model.save("ppo_trading_agent")
-        self.logger.info("Đã hoàn thành RL training")
-        
-        return {
-            'total_timesteps': total_timesteps,
-            'training_completed': True
-        }
+        try:
+            if not self.model:
+                self.logger.info("Creating RL model...")
+                self.create_model()
+            
+            if not self.model:
+                self.logger.error("Failed to create RL model")
+                return {'error': 'Model creation failed'}
+            
+            self.logger.info(f"Bắt đầu training RL agent trong {total_timesteps} steps")
+            
+            # Train model with error handling
+            try:
+                self.logger.info("Starting RL model training...")
+                with self.model.env.envs[0] as env:
+                    self.model.learn(
+                        total_timesteps=total_timesteps,
+                        callback=TrainingCallback(),
+                        progress_bar=True
+                    )
+                self.logger.info("✅ RL model training completed")
+            except Exception as e:
+                self.logger.error(f"RL training failed: {e}")
+                return {'error': f'Training failed: {str(e)}'}
+            
+            # Save model with error handling
+            try:
+                self.logger.info("Saving RL model...")
+                self.model.save("ppo_trading_agent")
+                self.logger.info("✅ RL model saved successfully")
+            except Exception as e:
+                self.logger.error(f"Failed to save RL model: {e}")
+                return {
+                    'total_timesteps': total_timesteps,
+                    'training_completed': True,
+                    'save_error': str(e)
+                }
+            
+            self.logger.info("Đã hoàn thành RL training")
+            
+            return {
+                'total_timesteps': total_timesteps,
+                'training_completed': True
+            }
+            
+        except Exception as e:
+            self.logger.error(f"RL training failed: {e}")
+            return {'error': f'Training failed: {str(e)}'}
     
     def predict(self, observation) -> Tuple[np.ndarray, Dict]:
         """Dự đoán action với RL model"""
