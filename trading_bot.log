@@ -37,3 +37,92 @@ AttributeError: 'TradingBotController' object has no attribute 'run'
 2025-10-03 17:30:03,520 - BotCore - INFO - 📈 Fetched 100 historical records for EURUSD
 2025-10-03 17:30:03,523 - BotCore - INFO - 🤖 Training ensemble model...
 2025-10-03 17:30:03,534 - MasterAgent - INFO - 🎓 Training AI models cho XAUUSD với 499 data points...
+2025-10-03 17:58:46,980 - EnsembleModel - INFO - Best xgboost params: {'max_depth': 3, 'learning_rate': 0.06148911475296508, 'n_estimators': 286, 'subsample': 0.6470995178117097, 'colsample_bytree': 0.7312893067595283}
+2025-10-03 17:58:46,990 - EnsembleModel - INFO - Hoàn thành optimization cho xgboost
+2025-10-03 17:59:30,551 - EnsembleModel - INFO - Best lightgbm params: {'num_leaves': 10, 'max_depth': 7, 'learning_rate': 0.2595771748446464, 'n_estimators': 352, 'subsample': 0.6873892642652978, 'colsample_bytree': 0.6771641966309047, 'min_child_samples': 46, 'min_data_in_leaf': 48, 'min_sum_hessian_in_leaf': 0.6940679485116531, 'max_bin': 134}
+2025-10-03 17:59:30,556 - EnsembleModel - INFO - Hoàn thành optimization cho lightgbm
+2025-10-03 18:04:12,128 - EnsembleModel - INFO - Best random_forest params: {'n_estimators': 462, 'max_depth': 9, 'min_samples_split': 19, 'min_samples_leaf': 9, 'max_features': 'sqrt'}
+2025-10-03 18:04:12,130 - EnsembleModel - INFO - Hoàn thành optimization cho random_forest
+2025-10-03 18:04:14,794 - EnsembleModel - INFO - Sử dụng calibrated model cho xgboost
+2025-10-03 18:04:14,867 - EnsembleModel - INFO - Hoàn thành training xgboost
+2025-10-03 18:04:15,249 - EnsembleModel - INFO - Sử dụng calibrated model cho lightgbm
+2025-10-03 18:04:15,284 - EnsembleModel - INFO - Hoàn thành training lightgbm
+2025-10-03 18:04:17,919 - EnsembleModel - INFO - Sử dụng calibrated model cho random_forest
+2025-10-03 18:04:17,991 - EnsembleModel - INFO - Hoàn thành training random_forest
+2025-10-03 18:04:18,004 - EnsembleModel - INFO - Hoàn thành ensemble training
+2025-10-03 18:04:22,221 - EnsembleModel - INFO - Ensemble CV scores - Accuracy: 0.588, F1: 0.094
+2025-10-03 18:04:23,037 - EnsembleModel - INFO - ✅ Ensemble model saved to test_ensemble_model.pkl
+2025-10-03 18:04:23,483 - EnsembleModel - INFO - ✅ Ensemble model loaded from test_ensemble_model.pkl
+2025-10-03 18:04:23,868 - EnsembleModel - INFO - Training data shapes: X_seq=(190, 10, 3), y_seq=(190, 1)
+2025-10-03 18:04:23,868 - EnsembleModel - ERROR - Model training error: 'NoneType' object has no attribute 'fit'
+2025-10-03 18:04:23,869 - EnsembleModel - WARNING - No LSTM model to save
+2025-10-03 18:07:23,713 - EnsembleModel - INFO - Best xgboost params: {'max_depth': 3, 'learning_rate': 0.011945948560273811, 'n_estimators': 190, 'subsample': 0.6398806839717089, 'colsample_bytree': 0.7210107944009209}
+2025-10-03 18:07:23,714 - EnsembleModel - INFO - Hoàn thành optimization cho xgboost
+2025-10-03 18:08:00,724 - EnsembleModel - INFO - Best lightgbm params: {'num_leaves': 80, 'max_depth': 8, 'learning_rate': 0.2123485676519442, 'n_estimators': 806, 'subsample': 0.9608912927570941, 'colsample_bytree': 0.9642629324860832, 'min_child_samples': 46, 'min_data_in_leaf': 32, 'min_sum_hessian_in_leaf': 0.11000342664790698, 'max_bin': 193}
+2025-10-03 18:08:00,729 - EnsembleModel - INFO - Hoàn thành optimization cho lightgbm
+2025-10-03 18:10:39,405 - EnsembleModel - INFO - Best random_forest params: {'n_estimators': 109, 'max_depth': 14, 'min_samples_split': 14, 'min_samples_leaf': 10, 'max_features': 'sqrt'}
+2025-10-03 18:10:39,406 - EnsembleModel - INFO - Hoàn thành optimization cho random_forest
+2025-10-03 18:10:40,705 - EnsembleModel - INFO - Sử dụng calibrated model cho xgboost
+2025-10-03 18:10:40,840 - EnsembleModel - INFO - Hoàn thành training xgboost
+2025-10-03 18:10:42,241 - EnsembleModel - INFO - Sử dụng calibrated model cho lightgbm
+2025-10-03 18:10:42,310 - EnsembleModel - INFO - Hoàn thành training lightgbm
+2025-10-03 18:10:43,007 - EnsembleModel - INFO - Sử dụng calibrated model cho random_forest
+2025-10-03 18:10:43,051 - EnsembleModel - INFO - Hoàn thành training random_forest
+2025-10-03 18:10:43,076 - EnsembleModel - INFO - Hoàn thành ensemble training
+2025-10-03 18:10:45,683 - EnsembleModel - INFO - Ensemble CV scores - Accuracy: 0.588, F1: 0.094
+2025-10-03 18:10:46,020 - EnsembleModel - INFO - ✅ Ensemble model saved to test_ensemble_model.pkl
+2025-10-03 18:10:46,280 - EnsembleModel - INFO - ✅ Ensemble model loaded from test_ensemble_model.pkl
+2025-10-03 18:10:46,549 - EnsembleModel - INFO - Training data shapes: X_seq=(190, 10, 3), y_seq=(190, 1)
+2025-10-03 18:10:46,550 - EnsembleModel - ERROR - Model not built, cannot train
+2025-10-03 18:10:46,550 - EnsembleModel - WARNING - No LSTM model to save
+2025-10-03 18:14:17,287 - EnsembleModel - INFO - Best xgboost params: {'max_depth': 5, 'learning_rate': 0.010739750415109384, 'n_estimators': 191, 'subsample': 0.6055108173718674, 'colsample_bytree': 0.640511949978695}
+2025-10-03 18:14:17,290 - EnsembleModel - INFO - Hoàn thành optimization cho xgboost
+2025-10-03 18:15:05,575 - EnsembleModel - INFO - Best lightgbm params: {'num_leaves': 89, 'max_depth': 7, 'learning_rate': 0.06973391323999178, 'n_estimators': 731, 'subsample': 0.9720199838078875, 'colsample_bytree': 0.6602388949164928, 'min_child_samples': 55, 'min_data_in_leaf': 8, 'min_sum_hessian_in_leaf': 0.9587305789656151, 'max_bin': 98}
+2025-10-03 18:15:05,578 - EnsembleModel - INFO - Hoàn thành optimization cho lightgbm
+2025-10-03 18:18:23,645 - EnsembleModel - INFO - Best random_forest params: {'n_estimators': 102, 'max_depth': 11, 'min_samples_split': 9, 'min_samples_leaf': 5, 'max_features': 'log2'}
+2025-10-03 18:18:23,647 - EnsembleModel - INFO - Hoàn thành optimization cho random_forest
+2025-10-03 18:18:25,550 - EnsembleModel - INFO - Sử dụng calibrated model cho xgboost
+2025-10-03 18:18:25,654 - EnsembleModel - INFO - Hoàn thành training xgboost
+2025-10-03 18:18:27,895 - EnsembleModel - INFO - Sử dụng calibrated model cho lightgbm
+2025-10-03 18:18:27,960 - EnsembleModel - INFO - Hoàn thành training lightgbm
+2025-10-03 18:18:28,595 - EnsembleModel - INFO - Sử dụng calibrated model cho random_forest
+2025-10-03 18:18:28,612 - EnsembleModel - INFO - Hoàn thành training random_forest
+2025-10-03 18:18:28,618 - EnsembleModel - INFO - Hoàn thành ensemble training
+2025-10-03 18:18:32,665 - EnsembleModel - INFO - Ensemble CV scores - Accuracy: 0.588, F1: 0.094
+2025-10-03 18:18:33,027 - EnsembleModel - INFO - ✅ Ensemble model saved to test_ensemble_model.pkl
+2025-10-03 18:18:33,290 - EnsembleModel - INFO - ✅ Ensemble model loaded from test_ensemble_model.pkl
+2025-10-03 18:18:33,654 - EnsembleModel - INFO - Training data shapes: X_seq=(190, 10, 3), y_seq=(190, 1)
+2025-10-03 18:18:33,654 - EnsembleModel - ERROR - Model not built, cannot train
+2025-10-03 18:18:33,654 - EnsembleModel - WARNING - No LSTM model to save
+2025-10-03 18:19:28,609 - EnsembleModel - INFO - Training data shapes: X_seq=(190, 10, 3), y_seq=(190, 1)
+2025-10-03 18:19:28,609 - EnsembleModel - ERROR - Model not built, cannot train
+2025-10-03 18:19:46,685 - EnsembleModel - INFO - Training data shapes: X_seq=(190, 10, 3), y_seq=(190, 1)
+2025-10-03 18:19:46,686 - EnsembleModel - ERROR - Model not built, cannot train
+2025-10-03 18:20:13,840 - EnsembleModel - INFO - Building LSTM model with feature_dim=3
+2025-10-03 18:20:14,759 - EnsembleModel - INFO - Đã xây dựng kiến trúc LSTM với Attention
+2025-10-03 18:20:14,824 - EnsembleModel - INFO - Training data shapes: X_seq=(190, 10, 3), y_seq=(190, 1)
+2025-10-03 18:20:42,708 - EnsembleModel - INFO - LSTM Training completed - Val Acc: 0.421, Val Loss: 0.694
+2025-10-03 18:24:01,601 - EnsembleModel - INFO - Best xgboost params: {'max_depth': 5, 'learning_rate': 0.08158294202498631, 'n_estimators': 108, 'subsample': 0.6771401444594011, 'colsample_bytree': 0.7575895211053526}
+2025-10-03 18:24:01,603 - EnsembleModel - INFO - Hoàn thành optimization cho xgboost
+2025-10-03 18:24:45,498 - EnsembleModel - INFO - Best lightgbm params: {'num_leaves': 17, 'max_depth': 3, 'learning_rate': 0.14544769439371105, 'n_estimators': 968, 'subsample': 0.8083510498575709, 'colsample_bytree': 0.9361206589520361, 'min_child_samples': 71, 'min_data_in_leaf': 36, 'min_sum_hessian_in_leaf': 0.8654688907833061, 'max_bin': 82}
+2025-10-03 18:24:45,500 - EnsembleModel - INFO - Hoàn thành optimization cho lightgbm
+2025-10-03 18:27:49,570 - EnsembleModel - INFO - Best random_forest params: {'n_estimators': 344, 'max_depth': 14, 'min_samples_split': 9, 'min_samples_leaf': 1, 'max_features': 'sqrt'}
+2025-10-03 18:27:49,572 - EnsembleModel - INFO - Hoàn thành optimization cho random_forest
+2025-10-03 18:27:50,951 - EnsembleModel - INFO - Sử dụng calibrated model cho xgboost
+2025-10-03 18:27:51,084 - EnsembleModel - INFO - Hoàn thành training xgboost
+2025-10-03 18:27:51,800 - EnsembleModel - INFO - Sử dụng calibrated model cho lightgbm
+2025-10-03 18:27:51,841 - EnsembleModel - INFO - Hoàn thành training lightgbm
+2025-10-03 18:27:54,273 - EnsembleModel - INFO - Sử dụng calibrated model cho random_forest
+2025-10-03 18:27:54,368 - EnsembleModel - INFO - Hoàn thành training random_forest
+2025-10-03 18:27:54,393 - EnsembleModel - INFO - Hoàn thành ensemble training
+2025-10-03 18:27:58,075 - EnsembleModel - INFO - Ensemble CV scores - Accuracy: 0.588, F1: 0.094
+2025-10-03 18:27:58,642 - EnsembleModel - INFO - ✅ Ensemble model saved to test_ensemble_model.pkl
+2025-10-03 18:27:59,181 - EnsembleModel - INFO - ✅ Ensemble model loaded from test_ensemble_model.pkl
+2025-10-03 18:27:59,521 - EnsembleModel - INFO - Building LSTM model with feature_dim=3
+2025-10-03 18:28:00,091 - EnsembleModel - INFO - Đã xây dựng kiến trúc LSTM với Attention
+2025-10-03 18:28:00,096 - EnsembleModel - INFO - Training data shapes: X_seq=(190, 10, 3), y_seq=(190, 1)
+2025-10-03 18:28:26,561 - EnsembleModel - INFO - LSTM Training completed - Val Acc: 0.447, Val Loss: 0.693
+2025-10-03 18:28:26,566 - absl - WARNING - You are saving your model as an HDF5 file via `model.save()` or `keras.saving.save_model(model)`. This file format is considered legacy. We recommend using instead the native Keras format, e.g. `model.save('my_model.keras')` or `keras.saving.save_model(model, 'my_model.keras')`. 
+2025-10-03 18:28:26,796 - EnsembleModel - INFO - ✅ LSTM model saved to test_lstm_model.h5
+2025-10-03 18:28:27,057 - absl - WARNING - Compiled the loaded model, but the compiled metrics have yet to be built. `model.compile_metrics` will be empty until you train or evaluate the model.
+2025-10-03 18:28:27,075 - EnsembleModel - INFO - ✅ LSTM model loaded from test_lstm_model.h5

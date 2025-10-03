@@ -1663,6 +1663,49 @@ class EnsembleModel:
             return normalized_X
         
         return X
+    
+    def save_model(self, filepath: str = "ensemble_model.pkl"):
+        """Lưu ensemble model vào file"""
+        try:
+            import joblib
+            
+            model_data = {
+                'models': self.models,
+                'meta_model': self.meta_model,
+                'feature_importance': self.feature_importance,
+                'model_configs': self.model_configs
+            }
+            
+            joblib.dump(model_data, filepath)
+            self.logger.info(f"✅ Ensemble model saved to {filepath}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to save ensemble model: {e}")
+            return False
+    
+    def load_model(self, filepath: str = "ensemble_model.pkl"):
+        """Load ensemble model từ file"""
+        try:
+            import joblib
+            
+            if not os.path.exists(filepath):
+                self.logger.warning(f"Model file {filepath} not found")
+                return False
+            
+            model_data = joblib.load(filepath)
+            
+            self.models = model_data.get('models', {})
+            self.meta_model = model_data.get('meta_model')
+            self.feature_importance = model_data.get('feature_importance', {})
+            self.model_configs = model_data.get('model_configs', self.model_configs)
+            
+            self.logger.info(f"✅ Ensemble model loaded from {filepath}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to load ensemble model: {e}")
+            return False
 
 # ===== LSTM MODEL VỚI ATTENTION =====
 class LSTMModel:
@@ -1679,51 +1722,65 @@ class LSTMModel:
     def _build_model(self):
         """Xây dựng kiến trúc LSTM với Attention"""
         
-        if self.feature_dim is None:
-            raise ValueError("Feature dimension must be set before building model")
-        
-        # Input layer
-        inputs = Input(shape=(self.sequence_length, self.feature_dim), name='input_sequences')
-        
-        # First LSTM layer with dropout
-        lstm1 = LSTM(128, return_sequences=True, dropout=0.2, recurrent_dropout=0.2)(inputs)
-        
-        # Attention mechanism
-        attention = tf.keras.layers.MultiHeadAttention(
-            num_heads=8, 
-            key_dim=128,
-            dropout=0.1
-        )(lstm1, lstm1)
-        
-        # Batch normalization after attention
-        attention_bn = BatchNormalization()(attention)
-        
-        # Second LSTM layer
-        lstm2 = LSTM(64, return_sequences=False, dropout=0.2, recurrent_dropout=0.2)(attention_bn)
-        lstm2_bn = BatchNormalization()(lstm2)
-        
-        # Dense layers
-        dense1 = Dense(64, activation='relu')(lstm2_bn)
-        dense1_drop = Dropout(0.3)(dense1)
-        
-        dense2 = Dense(32, activation='relu')(dense1_drop)
-        dense2_drop = Dropout(0.2)(dense2)
-        
-        # Output layer
-        output = Dense(1, activation='sigmoid', name='prediction')(dense2_drop)
-        
-        # Create model
-        self.model = Model(inputs=inputs, outputs=output)
-        
-        # Compile model
-        optimizer = Adam(learning_rate=0.001, clipnorm=1.0)
-        self.model.compile(
-            optimizer=optimizer,
-            loss='binary_crossentropy',
-            metrics=['accuracy', 'precision', 'recall']
-        )
-        
-        self.logger.info("Đã xây dựng kiến trúc LSTM với Attention")
+        try:
+            if self.feature_dim is None:
+                raise ValueError("Feature dimension must be set before building model")
+            
+            # Import TensorFlow components
+            import tensorflow as tf
+            from tensorflow.keras.models import Model
+            from tensorflow.keras.layers import Input, LSTM, Dense, Dropout, BatchNormalization
+            from tensorflow.keras.optimizers import Adam
+            
+            # Input layer
+            inputs = Input(shape=(self.sequence_length, self.feature_dim), name='input_sequences')
+            
+            # First LSTM layer with dropout
+            lstm1 = LSTM(128, return_sequences=True, dropout=0.2, recurrent_dropout=0.2)(inputs)
+            
+            # Attention mechanism
+            attention = tf.keras.layers.MultiHeadAttention(
+                num_heads=8, 
+                key_dim=128,
+                dropout=0.1
+            )(lstm1, lstm1)
+            
+            # Batch normalization after attention
+            attention_bn = BatchNormalization()(attention)
+            
+            # Second LSTM layer
+            lstm2 = LSTM(64, return_sequences=False, dropout=0.2, recurrent_dropout=0.2)(attention_bn)
+            lstm2_bn = BatchNormalization()(lstm2)
+            
+            # Dense layers
+            dense1 = Dense(64, activation='relu')(lstm2_bn)
+            dense1_drop = Dropout(0.3)(dense1)
+            
+            dense2 = Dense(32, activation='relu')(dense1_drop)
+            dense2_drop = Dropout(0.2)(dense2)
+            
+            # Output layer
+            output = Dense(1, activation='sigmoid', name='prediction')(dense2_drop)
+            
+            # Create model
+            self.model = Model(inputs=inputs, outputs=output)
+            
+            # Compile model
+            optimizer = Adam(learning_rate=0.001, clipnorm=1.0)
+            self.model.compile(
+                optimizer=optimizer,
+                loss='binary_crossentropy',
+                metrics=['accuracy', 'precision', 'recall']
+            )
+            
+            self.logger.info("Đã xây dựng kiến trúc LSTM với Attention")
+            
+        except Exception as e:
+            self.logger.error(f"Lỗi khi build LSTM model: {e}")
+            import traceback
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
+            self.model = None
+            raise
     
     def prepare_sequences(self, X: pd.DataFrame, y: pd.Series) -> Tuple[np.ndarray, np.ndarray]:
         """Chuẩn bị data thành sequences cho LSTM"""
@@ -1739,6 +1796,10 @@ class LSTMModel:
             old_dim = self.feature_dim
             self.feature_dim = X.shape[1]
             self.logger.info(f"LSTM feature dimension changed from {old_dim} to {self.feature_dim}, rebuilding model")
+            self._build_model()
+        elif self.model is None:
+            # Model hasn't been built yet, build it now
+            self.logger.info(f"Building LSTM model with feature_dim={self.feature_dim}")
             self._build_model()
         
         # Scale features
@@ -1818,6 +1879,11 @@ class LSTMModel:
         
         # Train model
         try:
+            # Ensure model is built
+            if self.model is None:
+                self.logger.error("Model not built, cannot train")
+                return {'error': 'Model not initialized'}
+            
             history = self.model.fit(
                 X_train_seq, y_train_seq,
                 validation_data=(X_val_seq, y_val_seq),
@@ -1880,6 +1946,66 @@ class LSTMModel:
         full_probabilities[self.sequence_length:] = probabilities
         
         return full_predictions, full_probabilities
+    
+    def save_model(self, filepath: str = "lstm_model.h5"):
+        """Lưu LSTM model vào file"""
+        try:
+            if self.model is None:
+                self.logger.warning("No LSTM model to save")
+                return False
+            
+            # Save Keras model
+            self.model.save(filepath)
+            
+            # Save additional data
+            import joblib
+            model_data = {
+                'sequence_length': self.sequence_length,
+                'feature_dim': self.feature_dim,
+                'is_trained': self.is_trained,
+                'scaler': self.scaler
+            }
+            
+            metadata_file = filepath.replace('.h5', '_metadata.pkl')
+            joblib.dump(model_data, metadata_file)
+            
+            self.logger.info(f"✅ LSTM model saved to {filepath}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to save LSTM model: {e}")
+            return False
+    
+    def load_model(self, filepath: str = "lstm_model.h5"):
+        """Load LSTM model từ file"""
+        try:
+            if not os.path.exists(filepath):
+                self.logger.warning(f"Model file {filepath} not found")
+                return False
+            
+            # Load Keras model
+            self.model = tf.keras.models.load_model(filepath)
+            
+            # Load additional data
+            import joblib
+            metadata_file = filepath.replace('.h5', '_metadata.pkl')
+            
+            if os.path.exists(metadata_file):
+                model_data = joblib.load(metadata_file)
+                self.sequence_length = model_data.get('sequence_length', 50)
+                self.feature_dim = model_data.get('feature_dim')
+                self.is_trained = model_data.get('is_trained', False)
+                self.scaler = model_data.get('scaler')
+            else:
+                self.logger.warning("Metadata file not found, using defaults")
+                self.is_trained = True  # Assume trained if model exists
+            
+            self.logger.info(f"✅ LSTM model loaded from {filepath}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to load LSTM model: {e}")
+            return False
 
 # ===== REINFORCEMENT LEARNING SYSTEM =====
 class PortfolioEnvironment(gym.Env):
@@ -2652,6 +2778,11 @@ class MasterAgent:
                     ensemble_scores = self.ensemble_model.train_ensemble(features, labels)
                     training_results['ensemble'] = ensemble_scores
                     self.logger.info(f"✅ Ensemble training completed - Accuracy: {ensemble_scores.get('accuracy', 0):.3f}")
+                    
+                    # Save ensemble model
+                    if self.ensemble_model.save_model(f"ensemble_model_{symbol}.pkl"):
+                        self.logger.info(f"💾 Ensemble model saved for {symbol}")
+                    
                 except Exception as e:
                     self.logger.error(f"Ensemble training failed: {e}")
                     training_results['ensemble'] = {'error': str(e)}
@@ -2662,6 +2793,11 @@ class MasterAgent:
                     lstm_scores = self.lstm_model.train(features, labels)
                     training_results['lstm'] = lstm_scores
                     self.logger.info(f"✅ LSTM training completed - Validation Accuracy: {lstm_scores.get('val_accuracy', 0):.3f}")
+                    
+                    # Save LSTM model
+                    if self.lstm_model.save_model(f"lstm_model_{symbol}.h5"):
+                        self.logger.info(f"💾 LSTM model saved for {symbol}")
+                    
                 except Exception as e:
                     self.logger.error(f"LSTM training failed: {e}")
                     training_results['lstm'] = {'error': str(e)}
@@ -3178,6 +3314,11 @@ class AutoRetrainManager:
                 ensemble_scores = self.ensemble_model.train_ensemble(X_train, y_train)
                 retrain_results['models_updated'].append('ensemble')
                 self.logger.info(f"Ensemble retrain completed - F1: {ensemble_scores.get('f1', 0):.3f}")
+                
+                # Save retrained ensemble model
+                if self.ensemble_model.save_model(f"ensemble_model_retrained_{symbol}.pkl"):
+                    self.logger.info(f"💾 Retrained ensemble model saved for {symbol}")
+                    
             except Exception as e:
                 self.logger.error(f"Lỗi retrain ensemble: {e}")
             
@@ -3186,6 +3327,11 @@ class AutoRetrainManager:
                 lstm_scores = self.lstm_model.train(X_train, y_train)
                 retrain_results['models_updated'].append('lstm')
                 self.logger.info(f"LSTM retrain completed - Val Acc: {lstm_scores.get('val_accuracy', 0):.3f}")
+                
+                # Save retrained LSTM model
+                if self.lstm_model.save_model(f"lstm_model_retrained_{symbol}.h5"):
+                    self.logger.info(f"💾 Retrained LSTM model saved for {symbol}")
+                    
             except Exception as e:
                 self.logger.error(f"Lỗi retrain LSTM: {e}")
             
@@ -3812,6 +3958,68 @@ class TradingBotController:
         self.cycle_count = 0
         self.last_data_fetch = None
         self.trading_session_start = None
+        
+        # Load existing models if available
+        self._load_existing_models()
+    
+    def _load_existing_models(self):
+        """Load existing trained models if available"""
+        try:
+            self.logger.info("🔍 Checking for existing trained models...")
+            
+            # Try to load ensemble models
+            ensemble_files = []
+            for symbol in Config.SYMBOLS:
+                files_to_check = [
+                    f"ensemble_model_{symbol}.pkl",
+                    f"ensemble_model_retrained_{symbol}.pkl",
+                    f"ensemble_model_initial_{symbol}.pkl"
+                ]
+                for file in files_to_check:
+                    if os.path.exists(file):
+                        ensemble_files.append(file)
+                        break
+            
+            if ensemble_files:
+                latest_ensemble = max(ensemble_files, key=os.path.getmtime)
+                if self.ensemble_model.load_model(latest_ensemble):
+                    self.logger.info(f"✅ Loaded ensemble model from {latest_ensemble}")
+                else:
+                    self.logger.warning("Failed to load ensemble model")
+            
+            # Try to load LSTM models
+            lstm_files = []
+            for symbol in Config.SYMBOLS:
+                files_to_check = [
+                    f"lstm_model_{symbol}.h5",
+                    f"lstm_model_retrained_{symbol}.h5", 
+                    f"lstm_model_initial_{symbol}.h5"
+                ]
+                for file in files_to_check:
+                    if os.path.exists(file):
+                        lstm_files.append(file)
+                        break
+            
+            if lstm_files:
+                latest_lstm = max(lstm_files, key=os.path.getmtime)
+                if self.lstm_model.load_model(latest_lstm):
+                    self.logger.info(f"✅ Loaded LSTM model from {latest_lstm}")
+                else:
+                    self.logger.warning("Failed to load LSTM model")
+            
+            # Try to load RL agent
+            if os.path.exists("ppo_trading_agent.zip"):
+                try:
+                    from stable_baselines3 import PPO
+                    self.rl_agent.model = PPO.load("ppo_trading_agent")
+                    self.logger.info("✅ Loaded RL agent model")
+                except Exception as e:
+                    self.logger.warning(f"Failed to load RL agent: {e}")
+            
+            self.logger.info("🎯 Model loading completed!")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error loading existing models: {e}")
     
     def setup_database(self):
         """Khởi tạo SQLite database và tạo bảng positions nếu chưa tồn tại"""
@@ -4256,6 +4464,11 @@ class TradingBotController:
                                     training_result = self.lstm_model.train(features_df, targets)
                                     if training_result.get('training_completed', False):
                                         self.logger.info("✅ LSTM model trained successfully!")
+                                        
+                                        # Save initial LSTM model
+                                        if self.lstm_model.save_model(f"lstm_model_initial_{symbol}.h5"):
+                                            self.logger.info(f"💾 Initial LSTM model saved for {symbol}")
+                                        
                                         break
                                     else:
                                         self.logger.warning(f"Training failed for {symbol}: {training_result}")
