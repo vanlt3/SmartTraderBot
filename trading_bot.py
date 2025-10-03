@@ -4286,7 +4286,7 @@ class TradingBotController:
                     return
             
             # 1. Fetch fresh market data
-            market_data = await self._fetch_all_market_data()
+            market_data = await self._fetch_all_market_data(open_markets)
             if not market_data:
                 self.logger.warning("No market data available, skipping cycle")
                 return
@@ -4381,19 +4381,19 @@ class TradingBotController:
             
             await self.discord_manager.send_error_notification("Trading Cycle Error", str(e))
     
-    async def _fetch_all_market_data(self) -> Dict[str, pd.DataFrame]:
-        """Lấy dữ liệu thị trường cho tất cả symbols"""
+    async def _fetch_all_market_data(self, symbols_to_fetch: List[str]) -> Dict[str, pd.DataFrame]:
+        """Lấy dữ liệu thị trường cho các symbols được chỉ định"""
         
         market_data = {}
         
         async with self.api_manager:
             # Fetch data sequentially to avoid rate limiting
-            for symbol in Config.SYMBOLS:
+            for symbol in symbols_to_fetch:
                 symbol_data = {}
                 for timeframe in Config.TIME_FRAMES:
                     try:
                         # Add delay between requests to respect rate limits
-                        await asyncio.sleep(1.0)  # Increased to 1.0s for better rate limit compliance
+                        await asyncio.sleep(1.5)  # Increased to 1.5s for better rate limit compliance
                         df = await self.data_manager.get_fresh_data(symbol, timeframe)
                         if df is not None:
                             symbol_data[timeframe] = df
