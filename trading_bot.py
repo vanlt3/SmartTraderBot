@@ -1641,15 +1641,19 @@ class LSTMModel:
         if self.feature_dim is None:
             self.feature_dim = X.shape[1]
             self.logger.info(f"LSTM feature dimension set to {self.feature_dim}")
+            # Rebuild model with correct feature dimension
+            self._build_model()
+        elif self.feature_dim != X.shape[1]:
+            # Feature dimension has changed, update it and rebuild model
+            old_dim = self.feature_dim
+            self.feature_dim = X.shape[1]
+            self.logger.info(f"LSTM feature dimension changed from {old_dim} to {self.feature_dim}, rebuilding model")
+            self._build_model()
         
         # Scale features
         scaler = sklearn.preprocessing.StandardScaler()
         X_scaled = scaler.fit_transform(X)
         self.scaler = scaler
-        
-        # Build model with correct feature dimension
-        if self.model is None:
-            self._build_model()
         
         # Ensure y has the same length as X_scaled after scaling
         if len(y) != len(X_scaled):
@@ -3881,13 +3885,35 @@ class TradingBotController:
                     if df is not None and hasattr(df, 'empty') and not df.empty:
                         # Add timeframe suffix to columns to avoid conflicts
                         df_with_timeframe = df.copy()
-                        df_with_timeframe.columns = [f"{col}_{timeframe}" if col not in ['datetime', 'timestamp'] else col for col in df.columns]
+                        
+                        # Normalize datetime column names - use 'datetime' consistently
+                        if 'timestamp' in df_with_timeframe.columns and 'datetime' not in df_with_timeframe.columns:
+                            df_with_timeframe = df_with_timeframe.rename(columns={'timestamp': 'datetime'})
+                        elif 'timestamp' not in df_with_timeframe.columns and 'datetime' not in df_with_timeframe.columns:
+                            # If no datetime column exists, create one from index
+                            df_with_timeframe.index.name = 'datetime'
+                            df_with_timeframe = df_with_timeframe.reset_index()
+                        
+                        df_with_timeframe.columns = [f"{col}_{timeframe}" if col not in ['datetime', 'timestamp'] else col for col in df_with_timeframe.columns]
                         
                         if combined_df is None:
                             combined_df = df_with_timeframe.copy()
                         else:
                             # Temporal alignment: align on datetime/timestamp
-                            combined_df = pd.merge(combined_df, df_with_timeframe, on='datetime', how='outer', suffixes=('', f'_{timeframe}'))
+                            try:
+                                # Ensure datetime column exists in both dataframes
+                                if 'datetime' not in combined_df.columns:
+                                    if 'timestamp' in combined_df.columns:
+                                        combined_df = combined_df.rename(columns={'timestamp': 'datetime'})
+                                    else:
+                                        combined_df.index.name = 'datetime'
+                                        combined_df = combined_df.reset_index()
+                                
+                                combined_df = pd.merge(combined_df, df_with_timeframe, on='datetime', how='outer', suffixes=('', f'_{timeframe}'))
+                            except Exception as merge_error:
+                                self.logger.warning(f"Failed to merge {symbol} {timeframe} data: {merge_error}")
+                                # Skip this timeframe if merge fails
+                                continue
                 
                 if combined_df is not None and not combined_df.empty:
                     enriched_data[symbol] = self.feature_engineer.engineer_all_features(combined_df, symbol)
@@ -3917,8 +3943,18 @@ class TradingBotController:
             self.logger.info(f"✅ Trading cycle #{self.cycle_count} completed in {cycle_duration:.2f}s")
             
         except Exception as e:
-            self.logger.error(f"❌ Lỗi trong trading cycle: {e}")
+            # Enhanced error logging for debugging
+            import traceback
+            error_details = f"Error: {str(e)}\nTraceback: {traceback.format_exc()}"
+            self.logger.error(f"❌ Lỗi trong trading cycle: {error_details}")
+            
+            # Specifically handle datetime-related errors
+            if 'datetime' in str(e).lower() or 'timestamp' in str(e).lower():
+                self.logger.error("🔍 Datetime-related error detected. Check DataFrame column names and datetime formats.")
+            
             await self.discord_manager.send_error_notification("Trading Cycle Error", str(e))
+<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>
+read_file
     
     async def _fetch_all_market_data(self) -> Dict[str, pd.DataFrame]:
         """Lấy dữ liệu thị trường cho tất cả symbols"""
