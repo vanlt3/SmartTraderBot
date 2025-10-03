@@ -2449,7 +2449,7 @@ class NewsSpecialistAgent:
 class MasterAgent:
     """Master Agent điều phối tất cả specialist agents và AI models"""
     
-    def __init__(self, trend_agent, news_agent, risk_agent, ensemble_model=None, lstm_model=None, rl_agent=None):
+    def __init__(self, trend_agent, news_agent, risk_agent, ensemble_model=None, lstm_model=None, rl_agent=None, feature_engineer=None):
         self.logger = LOG_MANAGER.get_logger('MasterAgent')
         self.trend_agent = trend_agent
         self.news_agent = news_agent
@@ -2457,6 +2457,7 @@ class MasterAgent:
         self.ensemble_model = ensemble_model
         self.lstm_model = lstm_model
         self.rl_agent = rl_agent
+        self.feature_engineer = feature_engineer
         self.decisions = {}
         self.ensemble_weight = 0.4
         self.lstm_weight = 0.3
@@ -2568,16 +2569,55 @@ class MasterAgent:
             # RL Agent action
             if self.rl_agent and self.rl_agent.model:
                 try:
-                    env_state = [portfolio_value, data.get('close', 0), risk_assessment['risk_level'] == 'HIGH']
-                    action, _ = self.rl_agent.model.predict(env_state, deterministic=True)
-                    rl_action = {
-                        'action': 'BUY' if action == 0 else 'SELL' if action == 1 else 'HOLD',
-                        'confidence': 0.7,  # Default RL confidence
-                        'action_id': action
-                    }
-                    self.logger.info(f"🤖 RL Agent action: {rl_action}")
+                    # Get latest features for RL prediction
+                    if isinstance(data, pd.DataFrame):
+                        # Use the latest row (most recent data)
+                        latest_data = data.iloc[-1:].copy()
+                        
+                        # Engineer features for RL prediction
+                        if self.feature_engineer:
+                            features_df = self.feature_engineer.engineer_all_features(latest_data, symbol)
+                            
+                            # Get numeric features only (exclude datetime, timestamp, etc.)
+                            prediction_features = features_df.select_dtypes(include=[np.number])
+                            
+                            # Convert to numpy array for RL model
+                            observation = prediction_features.values.astype(np.float32)
+                            
+                            # Ensure observation matches expected shape
+                            if len(observation) > 0:
+                                observation = observation.flatten()
+                                
+                                # Pad or truncate to match RL model's expected input size
+                                if hasattr(self.rl_agent.environment, 'observation_space'):
+                                    expected_size = self.rl_agent.environment.observation_space.shape[0]
+                                    if len(observation) < expected_size:
+                                        observation = np.pad(observation, (0, expected_size - len(observation)), 'constant')
+                                    elif len(observation) > expected_size:
+                                        observation = observation[:expected_size]
+                                
+                                # Get RL prediction
+                                action, _ = self.rl_agent.model.predict(observation, deterministic=True)
+                                
+                                rl_action = {
+                                    'action': 'BUY' if action == 0 else 'SELL' if action == 1 else 'HOLD',
+                                    'confidence': 0.7,  # Default RL confidence
+                                    'action_id': action
+                                }
+                                self.logger.info(f"🤖 RL Agent action: {rl_action}")
+                            else:
+                                self.logger.warning("No features available for RL prediction")
+                                rl_action = None
+                        else:
+                            self.logger.warning("Feature engineer not available for RL prediction")
+                            rl_action = None
+                    else:
+                        self.logger.warning("Data format not supported for RL prediction")
+                        rl_action = None
+                        
                 except Exception as e:
                     self.logger.warning(f"RL Agent error: {e}")
+                    rl_action = None
             
             # 3. Weighted Ensemble Decision Making
             expert_votes = {'BUY': 0, 'SELL': 0, 'HOLD': 0}
@@ -4224,7 +4264,8 @@ class TradingBotController:
                 self.risk_agent,
                 ensemble_model=self.ensemble_model,
                 lstm_model=self.lstm_model,
-                rl_agent=self.rl_agent
+                rl_agent=self.rl_agent,
+                feature_engineer=self.feature_engineer
             )
             
             # Initialize Market Status Checker
@@ -4237,73 +4278,167 @@ class TradingBotController:
             import gymnasium as gym
             from stable_baselines3 import PPO
             
-            # Create simplified trading environment for RL
-            class SimpleTradingEnv(gym.Env):
-                def __init__(self, data_manager):
+            # Create real trading environment for RL
+            class RealTradingEnv(gym.Env):
+                def __init__(self, data_manager, historical_data, symbol, feature_engineer):
                     super().__init__()
                     self.data_manager = data_manager
-                    self.action_space = gym.spaces.Discrete(3)  # BUY, SELL, HOLD (0=BV, 1=SELL, 2=HOLD)
-                    self.observation_space = gym.spaces.Box(low=-1, high=1, shape=(10,), dtype=np.float32)
+                    self.historical_data = historical_data  # DataFrame with historical data
+                    self.symbol = symbol
+                    self.feature_engineer = feature_engineer
+                    self.logger = LOG_MANAGER.get_logger('RealTradingEnv')
+                    
+                    # Action space: 0=BUY, 1=SELL, 2=HOLD
+                    self.action_space = gym.spaces.Discrete(3)
+                    
+                    # Calculate observation space based on features
+                    self._calculate_observation_space()
+                    
+                    # Trading state
                     self.current_step = 0
-                    self.current_symbol = Config.SYMBOLS[0] if Config.SYMBOLS else "EURUSD"
+                    self.max_steps = len(historical_data) - 1  # Leave one step for next price calculation
+                    self.position = 0  # 0: no position, 1: long, -1: short
+                    self.entry_price = 0.0
                     
-                def step(self, action):
-                    # Get real features from data manager
-                    obs = self.data_manager.get_features(self.current_symbol, 'H1')
-                    
-                    if obs is None:
-                        # Fallback if no features available
-                        obs = np.array([0.0] * 10, dtype=np.float32)
+                def _calculate_observation_space(self):
+                    """Calculate observation space based on feature engineering"""
+                    if len(self.historical_data) > 0:
+                        # Create a sample with features to determine space size
+                        sample_data = self.historical_data.head(10).copy()
+                        features_df = self.feature_engineer.engineer_all_features(sample_data, self.symbol)
+                        
+                        # Get numeric features only (exclude datetime, timestamp, etc.)
+                        numeric_features = features_df.select_dtypes(include=[np.number])
+                        feature_count = len(numeric_features.columns)
+                        
+                        # Set observation space
+                        self.observation_space = gym.spaces.Box(
+                            low=-np.inf, 
+                            high=np.inf, 
+                            shape=(feature_count,), 
+                            dtype=np.float32
+                        )
+                        self.logger.info(f"RealTradingEnv observation space: {feature_count} features")
                     else:
-                        # Ensure we have exactly 10 features
-                        if len(obs) != 10:
-                            obs = np.pad(obs, (0, 10 - len(obs)), 'constant')[:10]
+                        # Fallback to default size
+                        self.observation_space = gym.spaces.Box(
+                            low=-np.inf, 
+                            high=np.inf, 
+                            shape=(50,), 
+                            dtype=np.float32
+                        )
+                
+                def step(self, action):
+                    """Execute action and return next observation, reward, done, info"""
                     
-                    # Simplified reward calculation based on action
-                    reward = self._calculate_reward(action)
+                    # Get current observation (features for current candle)
+                    obs = self._get_current_observation()
                     
+                    # Calculate reward based on action and next candle's price movement
+                    reward = self._calculate_real_reward(action)
+                    
+                    # Update position state
+                    self._update_position(action)
+                    
+                    # Move to next step
                     self.current_step += 1
-                    done = False
+                    done = self.current_step >= self.max_steps
+                    
                     info = {
-                        'symbol': self.current_symbol,
+                        'symbol': self.symbol,
                         'action': action,
-                        'step': self.current_step
+                        'step': self.current_step,
+                        'position': self.position,
+                        'entry_price': self.entry_price,
+                        'reward': reward
                     }
                     
                     return obs, reward, done, info
                 
                 def reset(self):
+                    """Reset environment to initial state"""
                     self.current_step = 0
-                    # Try to get features for the current symbol
-                    obs = self.data_manager.get_features(self.current_symbol, 'H1')
+                    self.position = 0
+                    self.entry_price = 0.0
                     
-                    if obs is None:
-                        # Fallback if no features available
-                        obs = np.array([0.0] * 10, dtype=np.float32)
-                    else:
-                        # Ensure we have exactly 10 features
-                        if len(obs) != 10:
-                            obs = np.pad(obs, (0, 10 - len(obs)), 'constant')[:10]
-                    
-                    return obs
+                    # Return initial observation
+                    return self._get_current_observation()
                 
-                def _calculate_reward(self, action: int) -> float:
-                    """Calculate reward based on action taken"""
-                    # For now, return a small random reward
-                    # In a real implementation, this would calculate based on actual trading performance
-                    import random
-                    reward_ranges = {0: (-0.1, 0.5), 1: (-0.1, 0.5), 2: (-0.05, 0.05)}  # BUY, SELL, HOLD
-                    min_reward, max_reward = reward_ranges[action]
-                    return random.uniform(min_reward, max_reward)
+                def _get_current_observation(self):
+                    """Get current observation (features for current candle)"""
+                    if self.current_step >= len(self.historical_data):
+                        # Return zeros if we're past the data
+                        return np.zeros(self.observation_space.shape[0], dtype=np.float32)
+                    
+                    # Get data up to current step
+                    current_data = self.historical_data.iloc[:self.current_step + 1].copy()
+                    
+                    # Engineer features
+                    features_df = self.feature_engineer.engineer_all_features(current_data, self.symbol)
+                    
+                    # Get the latest row (most recent features)
+                    if len(features_df) > 0:
+                        latest_features = features_df.iloc[-1]
+                        # Select only numeric features
+                        numeric_features = latest_features.select_dtypes(include=[np.number])
+                        
+                        # Convert to numpy array and ensure correct size
+                        obs = numeric_features.values.astype(np.float32)
+                        
+                        # Pad or truncate to match observation space
+                        target_size = self.observation_space.shape[0]
+                        if len(obs) < target_size:
+                            obs = np.pad(obs, (0, target_size - len(obs)), 'constant')
+                        elif len(obs) > target_size:
+                            obs = obs[:target_size]
+                        
+                        return obs
+                    else:
+                        return np.zeros(self.observation_space.shape[0], dtype=np.float32)
+                
+                def _calculate_real_reward(self, action: int) -> float:
+                    """Calculate reward based on actual price movement"""
+                    
+                    # Need at least 2 candles to calculate price movement
+                    if self.current_step + 1 >= len(self.historical_data):
+                        return 0.0
+                    
+                    current_price = self.historical_data.iloc[self.current_step]['close']
+                    next_price = self.historical_data.iloc[self.current_step + 1]['close']
+                    
+                    # Calculate price change percentage
+                    price_change_pct = (next_price - current_price) / current_price
+                    
+                    # Calculate reward based on action
+                    if action == 0:  # BUY
+                        reward = price_change_pct  # Profit if price goes up
+                    elif action == 1:  # SELL
+                        reward = -price_change_pct  # Profit if price goes down
+                    else:  # HOLD
+                        reward = 0.0  # No reward for holding
+                    
+                    # Add small penalty for frequent trading to encourage strategic decisions
+                    if action != 2:  # If not HOLD
+                        reward -= 0.001  # Small transaction cost
+                    
+                    return reward
+                
+                def _update_position(self, action: int):
+                    """Update position state based on action"""
+                    if action == 0:  # BUY
+                        if self.position <= 0:  # Enter long or close short
+                            self.position = 1
+                            self.entry_price = self.historical_data.iloc[self.current_step]['close']
+                    elif action == 1:  # SELL
+                        if self.position >= 0:  # Enter short or close long
+                            self.position = -1
+                            self.entry_price = self.historical_data.iloc[self.current_step]['close']
+                    # HOLD (action == 2) doesn't change position
             
-            if hasattr(self.data_manager, 'get_features'):
-                trading_env = SimpleTradingEnv(self.data_manager)
-                self.rl_agent = RLAgent(trading_env)
-                self.rl_agent.create_model()
-                self.logger.info("🤖 RL Agent initialized successfully")
-            else:
-                self.rl_agent = None
-                self.logger.warning("RL Agent skipped - data_manager missing features")
+            # Initialize RL Agent with placeholder environment
+            # Real environment will be created during training with actual historical data
+            self.rl_agent = None
+            self.logger.info("🤖 RL Agent will be initialized during training with real data")
             
             # Initialize Real-time Monitor
             self.real_time_monitor = RealTimeMonitor(self.risk_manager)
@@ -4636,6 +4771,42 @@ class TradingBotController:
                                     self.logger.warning(f"Skipping {symbol}: features/{len(features_df)}, targets/{len(targets) if targets is not None else 'None'}")
                 except Exception as e:
                     self.logger.warning(f"LSTM model training failed: {e}")
+            
+            # Train RL Agent if needed
+            if not self.rl_agent or not self.rl_agent.model:
+                self.logger.info("🤖 Training RL Agent with real trading environment...")
+                try:
+                    # Use the first symbol with sufficient data for RL training
+                    for symbol, enriched_df in enriched_training_data.items():
+                        if len(enriched_df) > 200:  # Need more data for RL training
+                            self.logger.info(f"Creating RealTradingEnv for {symbol} with {len(enriched_df)} candles")
+                            
+                            # Create RealTradingEnv with historical data
+                            trading_env = RealTradingEnv(
+                                data_manager=self.data_manager,
+                                historical_data=enriched_df,
+                                symbol=symbol,
+                                feature_engineer=self.feature_engineer
+                            )
+                            
+                            # Initialize RL Agent with real environment
+                            self.rl_agent = RLAgent(trading_env)
+                            self.rl_agent.create_model()
+                            
+                            # Train RL Agent
+                            self.logger.info(f"Starting RL training for {symbol}...")
+                            rl_result = self.rl_agent.train(total_timesteps=100000)
+                            
+                            if 'error' in rl_result:
+                                self.logger.error(f"❌ RL training failed: {rl_result['error']}")
+                            else:
+                                self.logger.info("✅ RL Agent training completed successfully!")
+                                break  # Train on one symbol initially
+                        else:
+                            self.logger.warning(f"Skipping {symbol}: insufficient data for RL training ({len(enriched_df)} candles)")
+                            
+                except Exception as e:
+                    self.logger.warning(f"RL Agent training failed: {e}")
             
             self.logger.info("🎓 Initial model training completed!")
             
