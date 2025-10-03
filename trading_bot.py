@@ -1040,7 +1040,7 @@ class AdvancedFeatureEngineer:
         return df
     
     def _add_market_regime(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Phân loại market regime: Trending vs Sideways"""
+        """Phân loại market regime: Trending vs Sideways với One-Hot Encoding"""
         
         # Tính ADX để xác định xu hướng
         adx_value = df['adx'].fillna(0)
@@ -1048,15 +1048,17 @@ class AdvancedFeatureEngineer:
         # Tính slope của moving average để xác định direction
         ma_slope = df['sma_20'].diff(5) / df['sma_20'].shift(5) * 100
         
-        # Xác định regime
+        # Xác định regime với One-Hot Encoding
         conditions = [
             (adx_value > 25) & (ma_slope > 0.1),  # Uptrend
             (adx_value > 25) & (ma_slope < -0.1),  # Downtrend
             adx_value <= 25  # Sideways
         ]
         
-        choices = ['uptrend', 'downtrend', 'sideways']
-        df['market_regime'] = np.select(conditions, choices, default='sideways')
+        # Tạo 3 cột One-Hot Encoding thay vì 1 cột text
+        df['regime_uptrend'] = np.select([conditions[0]], [1], default=0).astype(int)
+        df['regime_downtrend'] = np.select([conditions[1]], [1], default=0).astype(int)
+        df['regime_sideways'] = np.select([conditions[2]], [1], default=0).astype(int)
         
         return df
 
@@ -2155,6 +2157,164 @@ class PortfolioEnvironment(gym.Env):
         self.logger.info(f"Portfolio Value: ${self.portfolio_value:,.2f}")
         self.logger.info(f"Positions: {self.positions}")
         self.logger.info(f"Daily Returns (last 5): {self.daily_returns[-5:]}")
+
+class RealTradingEnv(gym.Env):
+    """Real trading environment for RL Agent training"""
+    
+    def __init__(self, data_manager, historical_data, symbol, feature_engineer):
+        super().__init__()
+        self.data_manager = data_manager
+        self.historical_data = historical_data  # DataFrame with historical data
+        self.symbol = symbol
+        self.feature_engineer = feature_engineer
+        self.logger = LOG_MANAGER.get_logger('RealTradingEnv')
+        
+        # Action space: 0=BUY, 1=SELL, 2=HOLD
+        self.action_space = gym.spaces.Discrete(3)
+        
+        # Calculate observation space based on features
+        self._calculate_observation_space()
+        
+        # Trading state
+        self.current_step = 0
+        self.max_steps = len(historical_data) - 1  # Leave one step for next price calculation
+        self.position = 0  # 0: no position, 1: long, -1: short
+        self.entry_price = 0.0
+        
+    def _calculate_observation_space(self):
+        """Calculate observation space based on feature engineering"""
+        if len(self.historical_data) > 0:
+            # Create a sample with features to determine space size
+            sample_data = self.historical_data.head(10).copy()
+            features_df = self.feature_engineer.engineer_all_features(sample_data, self.symbol)
+            
+            # Get numeric features only (exclude datetime, timestamp, etc.)
+            numeric_features = features_df.select_dtypes(include=[np.number])
+            feature_count = len(numeric_features.columns)
+            
+            # Set observation space
+            self.observation_space = gym.spaces.Box(
+                low=-np.inf, 
+                high=np.inf, 
+                shape=(feature_count,), 
+                dtype=np.float32
+            )
+            self.logger.info(f"RealTradingEnv observation space: {feature_count} features")
+        else:
+            # Fallback to default size
+            self.observation_space = gym.spaces.Box(
+                low=-np.inf, 
+                high=np.inf, 
+                shape=(50,), 
+                dtype=np.float32
+            )
+    
+    def step(self, action):
+        """Execute action and return next observation, reward, done, info"""
+        
+        # Get current observation (features for current candle)
+        obs = self._get_current_observation()
+        
+        # Calculate reward based on action and next candle's price movement
+        reward = self._calculate_real_reward(action)
+        
+        # Update position state
+        self._update_position(action)
+        
+        # Move to next step
+        self.current_step += 1
+        done = self.current_step >= self.max_steps
+        
+        info = {
+            'symbol': self.symbol,
+            'action': action,
+            'step': self.current_step,
+            'position': self.position,
+            'entry_price': self.entry_price,
+            'reward': reward
+        }
+        
+        return obs, reward, done, info
+    
+    def reset(self):
+        """Reset environment to initial state"""
+        self.current_step = 0
+        self.position = 0
+        self.entry_price = 0.0
+        
+        # Return initial observation
+        return self._get_current_observation()
+    
+    def _get_current_observation(self):
+        """Get current observation (features for current candle)"""
+        if self.current_step >= len(self.historical_data):
+            # Return zeros if we're past the data
+            return np.zeros(self.observation_space.shape[0], dtype=np.float32)
+        
+        # Get data up to current step
+        current_data = self.historical_data.iloc[:self.current_step + 1].copy()
+        
+        # Engineer features
+        features_df = self.feature_engineer.engineer_all_features(current_data, self.symbol)
+        
+        # Get the latest row (most recent features)
+        if len(features_df) > 0:
+            latest_features = features_df.iloc[-1]
+            # Select only numeric features
+            numeric_features = latest_features.select_dtypes(include=[np.number])
+            
+            # Convert to numpy array and ensure correct size
+            obs = numeric_features.values.astype(np.float32)
+            
+            # Pad or truncate to match observation space
+            target_size = self.observation_space.shape[0]
+            if len(obs) < target_size:
+                obs = np.pad(obs, (0, target_size - len(obs)), 'constant')
+            elif len(obs) > target_size:
+                obs = obs[:target_size]
+            
+            return obs
+        else:
+            return np.zeros(self.observation_space.shape[0], dtype=np.float32)
+    
+    def _calculate_real_reward(self, action: int) -> float:
+        """Calculate reward based on actual price movement"""
+        
+        # Need at least 2 candles to calculate price movement
+        if self.current_step + 1 >= len(self.historical_data):
+            return 0.0
+        
+        current_price = self.historical_data.iloc[self.current_step]['close']
+        next_price = self.historical_data.iloc[self.current_step + 1]['close']
+        
+        # Calculate price change percentage
+        price_change_pct = (next_price - current_price) / current_price
+        
+        # Calculate reward based on action
+        if action == 0:  # BUY
+            reward = price_change_pct  # Profit if price goes up
+        elif action == 1:  # SELL
+            reward = -price_change_pct  # Profit if price goes down
+        else:  # HOLD
+            reward = 0.0  # No reward for holding
+        
+        # Add small penalty for frequent trading to encourage strategic decisions
+        if action != 2:  # If not HOLD
+            reward -= 0.001  # Small transaction cost
+        
+        return reward
+    
+    def _update_position(self, action: int):
+        """Update position state based on action"""
+        if action == 0:  # BUY
+            if self.position <= 0:  # Enter long or close short
+                self.position = 1
+                self.entry_price = self.historical_data.iloc[self.current_step]['close']
+        elif action == 1:  # SELL
+            if self.position >= 0:  # Enter short or close long
+                self.position = -1
+                self.entry_price = self.historical_data.iloc[self.current_step]['close']
+        # HOLD (action == 2) doesn't change position
 
 class TrainingCallback(BaseCallback):
     """Custom callback cho RL training"""
@@ -4278,163 +4438,6 @@ class TradingBotController:
             import gymnasium as gym
             from stable_baselines3 import PPO
             
-            # Create real trading environment for RL
-            class RealTradingEnv(gym.Env):
-                def __init__(self, data_manager, historical_data, symbol, feature_engineer):
-                    super().__init__()
-                    self.data_manager = data_manager
-                    self.historical_data = historical_data  # DataFrame with historical data
-                    self.symbol = symbol
-                    self.feature_engineer = feature_engineer
-                    self.logger = LOG_MANAGER.get_logger('RealTradingEnv')
-                    
-                    # Action space: 0=BUY, 1=SELL, 2=HOLD
-                    self.action_space = gym.spaces.Discrete(3)
-                    
-                    # Calculate observation space based on features
-                    self._calculate_observation_space()
-                    
-                    # Trading state
-                    self.current_step = 0
-                    self.max_steps = len(historical_data) - 1  # Leave one step for next price calculation
-                    self.position = 0  # 0: no position, 1: long, -1: short
-                    self.entry_price = 0.0
-                    
-                def _calculate_observation_space(self):
-                    """Calculate observation space based on feature engineering"""
-                    if len(self.historical_data) > 0:
-                        # Create a sample with features to determine space size
-                        sample_data = self.historical_data.head(10).copy()
-                        features_df = self.feature_engineer.engineer_all_features(sample_data, self.symbol)
-                        
-                        # Get numeric features only (exclude datetime, timestamp, etc.)
-                        numeric_features = features_df.select_dtypes(include=[np.number])
-                        feature_count = len(numeric_features.columns)
-                        
-                        # Set observation space
-                        self.observation_space = gym.spaces.Box(
-                            low=-np.inf, 
-                            high=np.inf, 
-                            shape=(feature_count,), 
-                            dtype=np.float32
-                        )
-                        self.logger.info(f"RealTradingEnv observation space: {feature_count} features")
-                    else:
-                        # Fallback to default size
-                        self.observation_space = gym.spaces.Box(
-                            low=-np.inf, 
-                            high=np.inf, 
-                            shape=(50,), 
-                            dtype=np.float32
-                        )
-                
-                def step(self, action):
-                    """Execute action and return next observation, reward, done, info"""
-                    
-                    # Get current observation (features for current candle)
-                    obs = self._get_current_observation()
-                    
-                    # Calculate reward based on action and next candle's price movement
-                    reward = self._calculate_real_reward(action)
-                    
-                    # Update position state
-                    self._update_position(action)
-                    
-                    # Move to next step
-                    self.current_step += 1
-                    done = self.current_step >= self.max_steps
-                    
-                    info = {
-                        'symbol': self.symbol,
-                        'action': action,
-                        'step': self.current_step,
-                        'position': self.position,
-                        'entry_price': self.entry_price,
-                        'reward': reward
-                    }
-                    
-                    return obs, reward, done, info
-                
-                def reset(self):
-                    """Reset environment to initial state"""
-                    self.current_step = 0
-                    self.position = 0
-                    self.entry_price = 0.0
-                    
-                    # Return initial observation
-                    return self._get_current_observation()
-                
-                def _get_current_observation(self):
-                    """Get current observation (features for current candle)"""
-                    if self.current_step >= len(self.historical_data):
-                        # Return zeros if we're past the data
-                        return np.zeros(self.observation_space.shape[0], dtype=np.float32)
-                    
-                    # Get data up to current step
-                    current_data = self.historical_data.iloc[:self.current_step + 1].copy()
-                    
-                    # Engineer features
-                    features_df = self.feature_engineer.engineer_all_features(current_data, self.symbol)
-                    
-                    # Get the latest row (most recent features)
-                    if len(features_df) > 0:
-                        latest_features = features_df.iloc[-1]
-                        # Select only numeric features
-                        numeric_features = latest_features.select_dtypes(include=[np.number])
-                        
-                        # Convert to numpy array and ensure correct size
-                        obs = numeric_features.values.astype(np.float32)
-                        
-                        # Pad or truncate to match observation space
-                        target_size = self.observation_space.shape[0]
-                        if len(obs) < target_size:
-                            obs = np.pad(obs, (0, target_size - len(obs)), 'constant')
-                        elif len(obs) > target_size:
-                            obs = obs[:target_size]
-                        
-                        return obs
-                    else:
-                        return np.zeros(self.observation_space.shape[0], dtype=np.float32)
-                
-                def _calculate_real_reward(self, action: int) -> float:
-                    """Calculate reward based on actual price movement"""
-                    
-                    # Need at least 2 candles to calculate price movement
-                    if self.current_step + 1 >= len(self.historical_data):
-                        return 0.0
-                    
-                    current_price = self.historical_data.iloc[self.current_step]['close']
-                    next_price = self.historical_data.iloc[self.current_step + 1]['close']
-                    
-                    # Calculate price change percentage
-                    price_change_pct = (next_price - current_price) / current_price
-                    
-                    # Calculate reward based on action
-                    if action == 0:  # BUY
-                        reward = price_change_pct  # Profit if price goes up
-                    elif action == 1:  # SELL
-                        reward = -price_change_pct  # Profit if price goes down
-                    else:  # HOLD
-                        reward = 0.0  # No reward for holding
-                    
-                    # Add small penalty for frequent trading to encourage strategic decisions
-                    if action != 2:  # If not HOLD
-                        reward -= 0.001  # Small transaction cost
-                    
-                    return reward
-                
-                def _update_position(self, action: int):
-                    """Update position state based on action"""
-                    if action == 0:  # BUY
-                        if self.position <= 0:  # Enter long or close short
-                            self.position = 1
-                            self.entry_price = self.historical_data.iloc[self.current_step]['close']
-                    elif action == 1:  # SELL
-                        if self.position >= 0:  # Enter short or close long
-                            self.position = -1
-                            self.entry_price = self.historical_data.iloc[self.current_step]['close']
-                    # HOLD (action == 2) doesn't change position
-            
             # Initialize RL Agent with placeholder environment
             # Real environment will be created during training with actual historical data
             self.rl_agent = None
@@ -4757,18 +4760,29 @@ class TradingBotController:
                             features_df = enriched_df.select_dtypes(include=[np.number]).dropna()
                             if len(features_df) > 50:
                                 targets = self._create_training_targets(enriched_df)
-                                if targets is not None and len(targets) == len(features_df):
-                                    self.logger.info(f"Training LSTM model with {symbol}: features shape={features_df.shape}, targets shape={targets.shape}")
-                                    self.logger.info(f"LSTM training features: {list(features_df.columns)}")
-                                    # Train LSTM model
-                                    training_result = self.lstm_model.train(features_df, targets)
-                                    if training_result.get('training_completed', False):
-                                        self.logger.info("✅ LSTM model trained successfully!")
-                                        break
+                                if targets is not None:
+                                    # Ensure both dataframes have the same index to align them correctly
+                                    common_index = features_df.index.intersection(targets.index)
+                                    features_df = features_df.loc[common_index]
+                                    targets = targets.loc[common_index]
+                                    
+                                    # Log the final shapes to confirm they match
+                                    self.logger.info(f"Final aligned data shapes for LSTM: features={features_df.shape}, targets={targets.shape}")
+                                    
+                                    if len(features_df) > 50 and len(targets) > 50:
+                                        self.logger.info(f"Training LSTM model with {symbol}: features shape={features_df.shape}, targets shape={targets.shape}")
+                                        self.logger.info(f"LSTM training features: {list(features_df.columns)}")
+                                        # Train LSTM model
+                                        training_result = self.lstm_model.train(features_df, targets)
+                                        if training_result.get('training_completed', False):
+                                            self.logger.info("✅ LSTM model trained successfully!")
+                                            break
+                                        else:
+                                            self.logger.warning(f"Training failed for {symbol}: {training_result}")
                                     else:
-                                        self.logger.warning(f"Training failed for {symbol}: {training_result}")
+                                        self.logger.warning(f"Skipping {symbol}: insufficient data after alignment - features/{len(features_df)}, targets/{len(targets)}")
                                 else:
-                                    self.logger.warning(f"Skipping {symbol}: features/{len(features_df)}, targets/{len(targets) if targets is not None else 'None'}")
+                                    self.logger.warning(f"Skipping {symbol}: targets is None")
                 except Exception as e:
                     self.logger.warning(f"LSTM model training failed: {e}")
             
