@@ -3986,9 +3986,26 @@ class MarketStatusChecker:
                     # Fallback to forex logic for unmapped symbols
                     return self._is_forex_market_open(now_utc)
                 
-                # Check if market is open using pandas_market_calendars
-                is_open = calendar.is_open_on_minute(now_utc)
-                return is_open
+                # CRITICAL FIX: Use robust schedule-based logic instead of is_open_on_minute
+                try:
+                    # Get schedule for today in UTC
+                    schedule = calendar.schedule(start_date=now_utc.date(), end_date=now_utc.date())
+                    
+                    # If schedule is empty, today is not a trading day (holiday, weekend)
+                    if schedule.empty:
+                        return False
+                    
+                    # Get market open and close times
+                    market_open = schedule.iloc[0]['market_open']
+                    market_close = schedule.iloc[0]['market_close']
+                    
+                    # Check if current time is within market hours
+                    return market_open <= now_utc < market_close
+                    
+                except Exception as schedule_error:
+                    self.logger.warning(f"Schedule check failed for {symbol}: {schedule_error}")
+                    # Fallback to forex logic on error
+                    return self._is_forex_market_open(now_utc)
             
             # Default fallback
             self.logger.warning(f"Unknown symbol {symbol}, using forex logic")
@@ -4495,18 +4512,29 @@ class TradingBotController:
                 self.logger.warning("⚠️ No historical data available for initial training")
                 return
             
+            # CRITICAL FIX: Engineer all features for training data to match prediction features
+            self.logger.info("🔧 Engineering features for training data to match prediction features...")
+            enriched_training_data = {}
+            for symbol, df in historical_data.items():
+                if len(df) > 100:  # Need sufficient data
+                    # Apply the same feature engineering as used during prediction
+                    enriched_df = self.feature_engineer.engineer_all_features(df, symbol)
+                    enriched_training_data[symbol] = enriched_df
+                    self.logger.info(f"✅ Engineered features for {symbol}: {enriched_df.shape[1]} features")
+            
             # Train ensemble model if needed
             if not ensemble_trained:
                 self.logger.info("🤖 Training ensemble model...")
                 try:
-                    for symbol, df in historical_data.items():
-                        if len(df) > 100:  # Need sufficient data
-                            # Prepare features and targets
-                            features_df = df.select_dtypes(include=[np.number]).dropna()
+                    for symbol, enriched_df in enriched_training_data.items():
+                        if len(enriched_df) > 100:  # Need sufficient data
+                            # Prepare features and targets from enriched data
+                            features_df = enriched_df.select_dtypes(include=[np.number]).dropna()
                             if len(features_df) > 50:
-                                targets = self._create_training_targets(df)
+                                targets = self._create_training_targets(enriched_df)
                                 if targets is not None:
-                                    await self.master_agent.trigger_ai_training(symbol, df)
+                                    self.logger.info(f"Training ensemble model with {symbol}: {features_df.shape[1]} features")
+                                    await self.master_agent.trigger_ai_training(symbol, enriched_df)
                                     break  # Train on one symbol initially
                 except Exception as e:
                     self.logger.warning(f"Ensemble model training failed: {e}")
@@ -4515,12 +4543,12 @@ class TradingBotController:
             if not lstm_trained:
                 self.logger.info("🧠 Training LSTM model...")
                 try:
-                    for symbol, df in historical_data.items():
-                        if len(df) > 100:  # Need sufficient data for LSTM
-                            # Use the same feature selection as during prediction
-                            features_df = df.select_dtypes(include=[np.number]).dropna()
+                    for symbol, enriched_df in enriched_training_data.items():
+                        if len(enriched_df) > 100:  # Need sufficient data for LSTM
+                            # Use the same enriched features as during prediction
+                            features_df = enriched_df.select_dtypes(include=[np.number]).dropna()
                             if len(features_df) > 50:
-                                targets = self._create_training_targets(df)
+                                targets = self._create_training_targets(enriched_df)
                                 if targets is not None and len(targets) == len(features_df):
                                     self.logger.info(f"Training LSTM model with {symbol}: features shape={features_df.shape}, targets shape={targets.shape}")
                                     self.logger.info(f"LSTM training features: {list(features_df.columns)}")
