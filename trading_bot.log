@@ -1,0 +1,16 @@
+2025-10-03 14:45:52,692 - EnsembleModel - INFO - LSTM feature dimension set to 5
+2025-10-03 14:45:53,300 - EnsembleModel - INFO - Đã xây dựng kiến trúc LSTM với Attention
+2025-10-03 14:46:08,173 - EnsembleModel - INFO - LSTM Training completed - Val Acc: 0.312, Val Loss: 0.695
+2025-10-03 14:46:46,503 - EnsembleModel - INFO - LSTM feature dimension set to 5
+2025-10-03 14:46:46,908 - EnsembleModel - INFO - Đã xây dựng kiến trúc LSTM với Attention
+2025-10-03 14:47:01,466 - EnsembleModel - INFO - LSTM Training completed - Val Acc: 0.500, Val Loss: 0.693
+2025-10-03 14:47:02,467 - EnsembleModel - WARNING - Feature dimension mismatch in predict: model expects 5, got 4
+2025-10-03 14:47:02,468 - EnsembleModel - INFO - Rebuilding LSTM model with new feature dimension...
+2025-10-03 14:47:02,730 - EnsembleModel - INFO - Đã xây dựng kiến trúc LSTM với Attention
+2025-10-03 14:47:27,541 - EnsembleModel - INFO - LSTM feature dimension set to 5
+2025-10-03 14:47:28,120 - EnsembleModel - INFO - Đã xây dựng kiến trúc LSTM với Attention
+2025-10-03 14:47:41,542 - EnsembleModel - INFO - LSTM Training completed - Val Acc: 0.500, Val Loss: 0.693
+2025-10-03 14:47:42,848 - EnsembleModel - WARNING - Feature dimension mismatch in predict: model expects 5, got 4
+2025-10-03 14:47:42,848 - EnsembleModel - INFO - Rebuilding LSTM model with new feature dimension...
+2025-10-03 14:47:43,092 - EnsembleModel - INFO - Đã xây dựng kiến trúc LSTM với Attention
+2025-10-03 14:47:43,095 - EnsembleModel - INFO - Scaler refitted for new feature dimension

@@ -1638,19 +1638,25 @@ class LSTMModel:
     def prepare_sequences(self, X: pd.DataFrame, y: pd.Series) -> Tuple[np.ndarray, np.ndarray]:
         """Chuẩn bị data thành sequences cho LSTM"""
         
-        # Determine feature dimension from data if not set
+        current_feature_count = X.shape[1]
+        
+        # Check if feature dimension changed (rebuild model if needed)
         if self.feature_dim is None:
-            self.feature_dim = X.shape[1]
+            self.feature_dim = current_feature_count
             self.logger.info(f"LSTM feature dimension set to {self.feature_dim}")
+            # Build initial model
+            self._build_model()
+        elif self.feature_dim != current_feature_count:
+            self.logger.warning(f"Feature dimension changed from {self.feature_dim} to {current_feature_count}")
+            self.logger.info("Rebuilding LSTM model with new feature dimension...")
+            self.feature_dim = current_feature_count
+            # Rebuild model with new feature dimension
+            self._build_model()
         
         # Scale features
         scaler = sklearn.preprocessing.StandardScaler()
         X_scaled = scaler.fit_transform(X)
         self.scaler = scaler
-        
-        # Build model with correct feature dimension
-        if self.model is None:
-            self._build_model()
         
         # Create sequences
         X_sequences = []
@@ -1730,6 +1736,21 @@ class LSTMModel:
         if not self.is_trained:
             self.logger.warning("LSTM model chưa được huấn luyện")
             return np.zeros(len(X)), np.zeros(len(X))
+        
+        # Check feature dimension consistency
+        current_feature_count = X.shape[1]
+        if self.feature_dim is None:
+            self.logger.error("LSTM model not properly initialized")
+            return np.zeros(len(X)), np.zeros(len(X))
+        elif self.feature_dim != current_feature_count:
+            self.logger.warning(f"Feature dimension mismatch in predict: model expects {self.feature_dim}, got {current_feature_count}")
+            self.logger.info("Rebuilding LSTM model with new feature dimension...")
+            self.feature_dim = current_feature_count
+            self._build_model()
+            # Refit scaler with new data to handle different features
+            self.scaler = sklearn.preprocessing.StandardScaler()
+            X_fit_scaled = self.scaler.fit_transform(X)
+            self.logger.info("Scaler refitted for new feature dimension")
         
         # Prepare sequences
         X_scaled = self.scaler.transform(X)
@@ -3858,7 +3879,26 @@ class TradingBotController:
                             combined_df = df_with_timeframe.copy()
                         else:
                             # Temporal alignment: align on datetime/timestamp
-                            combined_df = pd.merge(combined_df, df_with_timeframe, on='datetime', how='outer', suffixes=('', f'_{timeframe}'))
+                            try:
+                                # Try datetime first, fallback to timestamp then index
+                                merge_keys = None
+                                if 'datetime' in combined_df.columns and 'datetime' in df_with_timeframe.columns:
+                                    merge_keys = 'datetime'
+                                elif 'timestamp' in combined_df.columns and 'timestamp' in df_with_timeframe.columns:
+                                    merge_keys = 'timestamp'
+                                elif combined_df.index.name == df_with_timeframe.index.name:
+                                    merged_df = combined_df.join(df_with_timeframe, how='outer', rsuffix=f'_{timeframe}')
+                                    combined_df = merged_df
+                                    continue
+                                
+                                if merge_keys:
+                                    combined_df = pd.merge(combined_df, df_with_timeframe, on=merge_keys, how='outer', suffixes=('', f'_{timeframe}'))
+                                else:
+                                    # Use index-based merge as fallback
+                                    combined_df = combined_df.join(df_with_timeframe, how='outer', rsuffix=f'_{timeframe}')
+                            except Exception as merge_error:
+                                self.logger.warning(f"Failed to merge {timeframe} data: {merge_error}")
+                                # Skip this dataframe if merge fails
                 
                 if combined_df is not None and not combined_df.empty:
                     enriched_data[symbol] = self.feature_engineer.engineer_all_features(combined_df, symbol)
