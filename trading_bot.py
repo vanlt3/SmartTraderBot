@@ -4152,8 +4152,61 @@ class TradingBotController:
             # Setup database first
             self.setup_database()
             
-            # Initialize API Manager
+            # Initialize API Manager first
             self.api_manager = APIManager()
+            
+            # Restore open positions from database
+            try:
+                conn = sqlite3.connect(Config.DB_PATH)
+                cursor = conn.cursor()
+                
+                # Query all open positions from database
+                cursor.execute("""
+                    SELECT id, symbol, status, position_type, size, entry_price, 
+                           stop_loss, take_profit, entry_time, risk_percentage
+                    FROM positions 
+                    WHERE status = 'open'
+                """)
+                
+                open_positions = cursor.fetchall()
+                conn.close()
+                
+                # Initialize risk_manager to store positions
+                self.risk_manager = AdvancedRiskManager(self.api_manager)
+                
+                # Restore each position
+                restored_count = 0
+                for row in open_positions:
+                    db_id, symbol, status, position_type, size, entry_price, stop_loss, take_profit, entry_time, risk_percentage = row
+                    
+                    # Recreate position_data dictionary with same structure as when position was opened
+                    position_data = {
+                        'db_id': db_id,
+                        'symbol': symbol,
+                        'status': status,
+                        'position_type': position_type,
+                        'size': size,
+                        'entry_price': entry_price,
+                        'stop_loss': stop_loss,
+                        'take_profit': take_profit,
+                        'entry_time': entry_time,
+                        'risk_percentage': risk_percentage,
+                        'timestamp': datetime.now()  # Update timestamp to current time
+                    }
+                    
+                    # Add restored position to risk manager
+                    self.risk_manager.open_positions[symbol] = position_data
+                    restored_count += 1
+                
+                if restored_count > 0:
+                    self.logger.info(f"✅ Loaded {restored_count} open positions from the database.")
+                else:
+                    self.logger.info("No open positions to load.")
+                    
+            except Exception as e:
+                self.logger.error(f"❌ Failed to restore open positions from database: {e}")
+                # Initialize risk_manager even if restoration fails
+                self.risk_manager = AdvancedRiskManager(self.api_manager)
             
             # Initialize Data Manager
             self.data_manager = EnhancedDataManager(self.api_manager)
@@ -4173,9 +4226,6 @@ class TradingBotController:
                 lstm_model=self.lstm_model,
                 rl_agent=self.rl_agent
             )
-            
-            # Initialize Risk Manager
-            self.risk_manager = AdvancedRiskManager(self.api_manager)
             
             # Initialize Market Status Checker
             self.market_checker = MarketStatusChecker()
