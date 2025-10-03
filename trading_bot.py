@@ -1343,6 +1343,7 @@ class EnsembleModel:
         self.models = {}
         self.meta_model = None
         self.feature_importance = {}
+        self.feature_names = None  # Store feature names used during training
         self.cv_scorer = sklearn.metrics.make_scorer(sklearn.metrics.accuracy_score)
         self.cv_splitter = PurgedGroupTimeSeriesSplit(n_splits=5, gap=10)
         
@@ -1432,6 +1433,10 @@ class EnsembleModel:
     def train_ensemble(self, X_train: pd.DataFrame, y_train: pd.Series) -> Dict[str, float]:
         """Huấn luyện ensemble models với optimized parameters"""
         
+        # Store feature names for consistency during prediction
+        self.feature_names = list(X_train.columns)
+        self.logger.info(f"EnsembleModel storing feature names: {self.feature_names}")
+        
         # Tối ưu hóa từng model
         optimized_params = {}
         
@@ -1520,6 +1525,7 @@ class EnsembleModel:
             # Train ensemble on fold
             temp_ensemble = EnsembleModel()
             temp_ensemble.models = {}
+            temp_ensemble.feature_names = self.feature_names  # Copy feature names
             
             base_predictions = np.zeros((len(X_train_fold), len(self.models)))
             
@@ -1621,46 +1627,35 @@ class EnsembleModel:
     def _normalize_prediction_features(self, X: pd.DataFrame) -> pd.DataFrame:
         """Normalize prediction features to match training features"""
         
-        # Get training feature names from the first model
-        if self.models:
-            first_model_name = next(iter(self.models.keys()))
-            first_model = self.models[first_model_name]
+        # Use stored feature names from training
+        if self.feature_names is None:
+            self.logger.warning("No training feature names stored, using current features")
+            return X
+        
+        # Check if we have the same features as during training
+        current_features = set(X.columns)
+        training_features = set(self.feature_names)
+        
+        if current_features != training_features:
+            self.logger.warning(f"Feature mismatch detected!")
+            self.logger.warning(f"Training features: {sorted(training_features)}")
+            self.logger.warning(f"Prediction features: {sorted(current_features)}")
             
-            if hasattr(first_model, 'feature_names_in_'):
-                expected_features = first_model.feature_names_in_
-            else:
-                # If feature names not available, use column names as-is
-                return X
+            # Add missing features with default values
+            missing_features = training_features - current_features
+            if missing_features:
+                self.logger.warning(f"Adding missing features with default values: {missing_features}")
+                for feature in missing_features:
+                    X[feature] = 0.0
             
-            # Map current columns to expected features
-            feature_map = {}
-            for col in expected_features:
-                # Try exact match first
-                if col in X.columns:
-                    feature_map[col] = col
-                    continue
-                
-                # Try removing timeframe suffix
-                for suffix in ['_M15', '_H1', '_H4', '_D1']:
-                    suffixed_col = f"{col}{suffix}"
-                    if suffixed_col in X.columns:
-                        feature_map[col] = suffixed_col
-                        break
-                
-                # If still not found, create default value
-                if col not in feature_map:
-                    feature_map[col] = None
+            # Remove extra features
+            extra_features = current_features - training_features
+            if extra_features:
+                self.logger.warning(f"Removing extra features: {extra_features}")
+                X = X.drop(columns=list(extra_features))
             
-            # Create normalized DataFrame
-            normalized_X = pd.DataFrame()
-            for expected_col, actual_col in feature_map.items():
-                if actual_col and actual_col in X.columns:
-                    normalized_X[expected_col] = X[actual_col]
-                else:
-                    # Use default values - this may not work well but prevents crashes
-                    normalized_X[expected_col] = 0.5 if 'prob' in expected_col.lower() else 0
-            
-            return normalized_X
+            # Reorder columns to match training order
+            X = X[self.feature_names]
         
         return X
 
