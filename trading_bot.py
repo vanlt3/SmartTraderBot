@@ -82,6 +82,9 @@ warnings.filterwarnings('ignore')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress all TensorFlow logs
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # Disable CUDA devices
 os.environ['TF_DISABLE_GPU'] = '1'  # Additional flag to disable GPU
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'  # Disable OneDNN optimizations
+os.environ['TF_DISABLE_MKL'] = '1'  # Disable Intel MKL
+os.environ['TF_DISABLE_POOL_ALLOCATOR'] = '1'  # Disable pool allocator
 
 # Set UTF-8 encoding
 sys.stdout.reconfigure(encoding='utf-8')
@@ -294,12 +297,14 @@ class APIManager:
         self.retry_count = 3
         self.timeout = 10
         
-        # Rate limit settings (requests per minute)
+        # Rate limit settings (requests per minute) - More conservative
         self.rate_limit_config = {
-            'oanda': 30,  # Reduced from 100 to be more conservative
-            'finnhub': 60,
-            'newsapi': 1000,
-            'alpha_vantage': 5
+            'oanda': 15,  # Further reduced to be very conservative
+            'finnhub': 30,  # Reduced
+            'newsapi': 500,  # Reduced
+            'alpha_vantage': 3,  # Reduced
+            'marketaux': 50,  # Added
+            'yahoo_finance': 1000  # Added
         }
     
     async def __aenter__(self):
@@ -1228,7 +1233,11 @@ class NewsEconomicManager:
         """Fetch news từ Finnhub - Skip FinnHub due to invalid API key for now"""
         # Skip FinnHub due to invalid API key (returns 401)
         # Return empty list to avoid crashes
-        self.logger.warning(f"Skipping FinnHub news for {symbol} due to invalid API key")
+        if Config.FINNHUB_API_KEY == "YOUR_VALID_FINNHUB_KEY_HERE":
+            # Only log once per session to reduce noise
+            if not hasattr(self, '_finnhub_warning_logged'):
+                self.logger.warning("Skipping FinnHub news due to invalid API key (set FINNHUB_API_KEY in config)")
+                self._finnhub_warning_logged = True
         return []
     
     async def _fetch_marketaux_news(self, symbol: str) -> List[Dict]:
@@ -1266,8 +1275,12 @@ class NewsEconomicManager:
             'apiKey': Config.NEWSAPI_API_KEY
         }
         
-        data = await self.api_manager._make_request(url, params=params, api_name='newsapi')
-        return data or {}
+        try:
+            data = await self.api_manager._make_request(url, params=params, api_name='newsapi')
+            return data or {}
+        except Exception as e:
+            self.logger.warning(f"NewsAPI request failed: {e}")
+            return {}
     
     async def fetch_economic_calendar(self, hours_ahead: int = 24) -> List[Dict]:
         """Lấy lịch kinh tế"""
@@ -1670,21 +1683,19 @@ class EnsembleModel:
         training_features = set(self.feature_names)
         
         if current_features != training_features:
-            self.logger.warning(f"Feature mismatch detected!")
-            self.logger.warning(f"Training features: {sorted(training_features)}")
-            self.logger.warning(f"Prediction features: {sorted(current_features)}")
+            # Only log detailed mismatch info in debug mode to reduce noise
+            if len(current_features) > len(training_features) * 2:  # Significant mismatch
+                self.logger.warning(f"Feature mismatch detected! Training: {len(training_features)} features, Prediction: {len(current_features)} features")
             
             # Add missing features with default values
             missing_features = training_features - current_features
             if missing_features:
-                self.logger.warning(f"Adding missing features with default values: {missing_features}")
                 for feature in missing_features:
                     X[feature] = 0.0
             
-            # Remove extra features
+            # Remove extra features (keep only training features)
             extra_features = current_features - training_features
             if extra_features:
-                self.logger.warning(f"Removing extra features: {extra_features}")
                 X = X.drop(columns=list(extra_features))
             
             # Reorder columns to match training order
@@ -1957,21 +1968,19 @@ class LSTMModel:
         training_features = set(self.feature_names)
         
         if current_features != training_features:
-            self.logger.warning(f"Feature mismatch detected!")
-            self.logger.warning(f"Training features: {sorted(training_features)}")
-            self.logger.warning(f"Prediction features: {sorted(current_features)}")
+            # Only log detailed mismatch info in debug mode to reduce noise
+            if len(current_features) > len(training_features) * 2:  # Significant mismatch
+                self.logger.warning(f"LSTM Feature mismatch detected! Training: {len(training_features)} features, Prediction: {len(current_features)} features")
             
             # Add missing features with default values
             missing_features = training_features - current_features
             if missing_features:
-                self.logger.warning(f"Adding missing features with default values: {missing_features}")
                 for feature in missing_features:
                     X[feature] = 0.0
             
-            # Remove extra features
+            # Remove extra features (keep only training features)
             extra_features = current_features - training_features
             if extra_features:
-                self.logger.warning(f"Removing extra features: {extra_features}")
                 X = X.drop(columns=list(extra_features))
             
             # Reorder columns to match training order
@@ -4257,7 +4266,7 @@ class TradingBotController:
                 for timeframe in Config.TIME_FRAMES:
                     try:
                         # Add delay between requests to respect rate limits
-                        await asyncio.sleep(0.5)  # Increased from 0.1s to 0.5s
+                        await asyncio.sleep(1.0)  # Increased to 1.0s for better rate limit compliance
                         df = await self.data_manager.get_fresh_data(symbol, timeframe)
                         if df is not None:
                             symbol_data[timeframe] = df
