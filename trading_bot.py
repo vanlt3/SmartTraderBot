@@ -3953,8 +3953,6 @@ class TradingBotController:
                 self.logger.error("🔍 Datetime-related error detected. Check DataFrame column names and datetime formats.")
             
             await self.discord_manager.send_error_notification("Trading Cycle Error", str(e))
-<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>
-read_file
     
     async def _fetch_all_market_data(self) -> Dict[str, pd.DataFrame]:
         """Lấy dữ liệu thị trường cho tất cả symbols"""
