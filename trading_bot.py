@@ -1675,6 +1675,7 @@ class LSTMModel:
         self.logger = LOG_MANAGER.get_logger('EnsembleModel')
         self.is_trained = False
         self.scaler = None
+        self.feature_names = None  # Store feature names used during training
     
     def _build_model(self):
         """Xây dựng kiến trúc LSTM với Attention"""
@@ -1728,6 +1729,10 @@ class LSTMModel:
     def prepare_sequences(self, X: pd.DataFrame, y: pd.Series) -> Tuple[np.ndarray, np.ndarray]:
         """Chuẩn bị data thành sequences cho LSTM"""
         
+        # Store feature names for consistency during prediction
+        self.feature_names = list(X.columns)
+        self.logger.info(f"LSTM storing feature names: {self.feature_names}")
+        
         # Determine feature dimension from data if not set
         if self.feature_dim is None:
             self.feature_dim = X.shape[1]
@@ -1745,6 +1750,8 @@ class LSTMModel:
         scaler = sklearn.preprocessing.StandardScaler()
         X_scaled = scaler.fit_transform(X)
         self.scaler = scaler
+        # Store feature names for scaler consistency
+        self.scaler_feature_names = list(X.columns)
         
         # Ensure y has the same length as X_scaled after scaling
         if len(y) != len(X_scaled):
@@ -1856,7 +1863,12 @@ class LSTMModel:
             self.logger.warning("LSTM model chưa được huấn luyện")
             return np.zeros(len(X)), np.zeros(len(X))
         
-        # Prepare sequences
+        # Ensure feature consistency with training data
+        X = self.ensure_feature_consistency(X)
+        
+        # Prepare sequences - ensure X has the same column order as during training
+        if hasattr(self, 'scaler_feature_names'):
+            X = X[self.scaler_feature_names]
         X_scaled = self.scaler.transform(X)
         X_sequences = []
         
@@ -1880,6 +1892,40 @@ class LSTMModel:
         full_probabilities[self.sequence_length:] = probabilities
         
         return full_predictions, full_probabilities
+    
+    def ensure_feature_consistency(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Ensure feature consistency with training data"""
+        
+        if self.feature_names is None:
+            self.logger.warning("No training feature names stored, using current features")
+            return X
+        
+        # Check if we have the same features as during training
+        current_features = set(X.columns)
+        training_features = set(self.feature_names)
+        
+        if current_features != training_features:
+            self.logger.warning(f"Feature mismatch detected!")
+            self.logger.warning(f"Training features: {sorted(training_features)}")
+            self.logger.warning(f"Prediction features: {sorted(current_features)}")
+            
+            # Add missing features with default values
+            missing_features = training_features - current_features
+            if missing_features:
+                self.logger.warning(f"Adding missing features with default values: {missing_features}")
+                for feature in missing_features:
+                    X[feature] = 0.0
+            
+            # Remove extra features
+            extra_features = current_features - training_features
+            if extra_features:
+                self.logger.warning(f"Removing extra features: {extra_features}")
+                X = X.drop(columns=list(extra_features))
+            
+            # Reorder columns to match training order
+            X = X[self.feature_names]
+        
+        return X
 
 # ===== REINFORCEMENT LEARNING SYSTEM =====
 class PortfolioEnvironment(gym.Env):
@@ -2400,14 +2446,11 @@ class MasterAgent:
                             seq_len = getattr(self.lstm_model, 'sequence_length', 50)
                             lstm_data = data.tail(seq_len + 1).copy()
                             
-                            # Remove non-feature columns
-                            lstm_features = lstm_data.drop(
-                                columns=[col for col in lstm_data.columns 
-                                        if col in ['datetime', 'timestamp'] or col.startswith('_')]
-                            ).fillna(0)
+                            # Remove non-feature columns but keep all numeric features
+                            lstm_features = lstm_data.select_dtypes(include=[np.number]).fillna(0)
                         else:
-                            # Handle dict/other data types
-                            lstm_features = pd.DataFrame([data]).fillna(0)
+                            # Handle dict/other data types - convert to DataFrame with numeric features only
+                            lstm_features = pd.DataFrame([data]).select_dtypes(include=[np.number]).fillna(0)
                         
                         lstm_pred, lstm_conf = self.lstm_model.predict(lstm_features)
                         
@@ -4247,11 +4290,13 @@ class TradingBotController:
                 try:
                     for symbol, df in historical_data.items():
                         if len(df) > 100:  # Need sufficient data for LSTM
+                            # Use the same feature selection as during prediction
                             features_df = df.select_dtypes(include=[np.number]).dropna()
                             if len(features_df) > 50:
                                 targets = self._create_training_targets(df)
                                 if targets is not None and len(targets) == len(features_df):
                                     self.logger.info(f"Training LSTM model with {symbol}: features shape={features_df.shape}, targets shape={targets.shape}")
+                                    self.logger.info(f"LSTM training features: {list(features_df.columns)}")
                                     # Train LSTM model
                                     training_result = self.lstm_model.train(features_df, targets)
                                     if training_result.get('training_completed', False):
