@@ -1391,7 +1391,8 @@ class EnsembleModel:
             },
             'random_forest': {
                 'random_state': 42,
-                'n_jobs': -1
+                'n_jobs': -1,
+                'class_weight': 'balanced'  # Ensure proper multi-class handling
             }
         }
     
@@ -1549,6 +1550,21 @@ class EnsembleModel:
                     
                     # Get predictions for multi-class - store all class probabilities
                     pred_proba = model.predict_proba(X_train)
+                    
+                    # Ensure we have the correct number of classes (3)
+                    if pred_proba.shape[1] != 3:
+                        self.logger.warning(f"{model_name} returned {pred_proba.shape[1]} classes, expected 3. Padding with zeros.")
+                        # Create a 3-class probability matrix
+                        padded_proba = np.zeros((pred_proba.shape[0], 3))
+                        # Copy existing probabilities
+                        padded_proba[:, :pred_proba.shape[1]] = pred_proba
+                        # Distribute remaining probability equally among missing classes
+                        if pred_proba.shape[1] < 3:
+                            remaining_prob = (1.0 - pred_proba.sum(axis=1)) / (3 - pred_proba.shape[1])
+                            for j in range(pred_proba.shape[1], 3):
+                                padded_proba[:, j] = remaining_prob
+                        pred_proba = padded_proba
+                    
                     # For multi-class, we need to store probabilities for all classes
                     # Reshape to store 3 classes per model
                     base_predictions[:, i*3:(i+1)*3] = pred_proba
@@ -1643,7 +1659,13 @@ class EnsembleModel:
                     temp_ensemble.models[name] = fresh_model
                     
                     if hasattr(fresh_model, 'predict_proba'):
-                        base_predictions[:, i] = fresh_model.predict_proba(X_train_fold)[:, 1]
+                        pred_proba = fresh_model.predict_proba(X_train_fold)
+                        # For multi-class, use the probability of the positive class (BUY=1)
+                        # Ensure we have at least 2 classes
+                        if pred_proba.shape[1] >= 2:
+                            base_predictions[:, i] = pred_proba[:, 1]  # BUY class probability
+                        else:
+                            base_predictions[:, i] = pred_proba[:, 0]  # Fallback to first class
                     else:
                         predictions = fresh_model.decision_function(X_train_fold)
                         scaler = MinMaxScaler()
