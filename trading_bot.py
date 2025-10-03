@@ -1423,9 +1423,9 @@ class EnsembleModel:
                     calibrated_model = CalibratedClassifierCV(model, method='sigmoid', cv=3)
                     calibrated_model.fit(X_train, y_train)
                     
-                    # Verify calibration was successful
-                    if not hasattr(calibrated_model, 'estimator_') or calibrated_model.estimator_ is None:
-                        raise ValueError("Calibration failed - no estimator found")
+                    # Verify calibration was successful by checking if calibrated_classifiers_ exist
+                    if not hasattr(calibrated_model, 'calibrated_classifiers_') or len(calibrated_model.calibrated_classifiers_) == 0:
+                        raise ValueError("Calibration failed - no calibrated classifiers found")
                     
                     self.logger.info(f"Sử dụng calibrated model cho {model_name}")
                 except Exception as calib_error:
