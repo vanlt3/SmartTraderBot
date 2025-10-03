@@ -974,36 +974,44 @@ class AdvancedFeatureEngineer:
         # Supply zones: các đỉnh với rejection
         supply_zones = []
         for i in range(lookback, len(df)):
-            if i >= len(df):
+            if i >= len(df) or i < lookback:
                 break
-            window_high = df['high'].iloc[i-lookback:i].max()
-            current_high = df['high'].iloc[i]
-            
-            if current_high == window_high:
-                # Kiểm tra rejection từ vùng này
-                rejected = (
-                    df['close'].iloc[i] < window_high * 0.995 and
-                    df['volume'].iloc[i] > df['volume'].iloc[i-lookback:i].mean()
-                )
-                if rejected:
-                    supply_zones.append(i)
+            try:
+                window_high = df['high'].iloc[i-lookback:i].max()
+                current_high = df['high'].iloc[i]
+                
+                if current_high == window_high:
+                    # Kiểm tra rejection từ vùng này
+                    rejected = (
+                        df['close'].iloc[i] < window_high * 0.995 and
+                        df['volume'].iloc[i] > df['volume'].iloc[i-lookback:i].mean()
+                    )
+                    if rejected:
+                        supply_zones.append(i)
+            except (IndexError, KeyError) as e:
+                self.logger.warning(f"Index error in supply zone detection at index {i}: {e}")
+                continue
         
         # Demand zones: các đáy với bounce
         demand_zones = []
         for i in range(lookback, len(df)):
-            if i >= len(df):
+            if i >= len(df) or i < lookback:
                 break
-            window_low = df['low'].iloc[i-lookback:i].min()
-            current_low = df['low'].iloc[i]
-            
-            if current_low == window_low:
-                # Kiểm tra bounce từ vùng này
-                bounced = (
-                    df['close'].iloc[i] > window_low * 1.005 and
-                    df['volume'].iloc[i] > df['volume'].iloc[i-lookback:i].mean()
-                )
-                if bounced:
-                    demand_zones.append(i)
+            try:
+                window_low = df['low'].iloc[i-lookback:i].min()
+                current_low = df['low'].iloc[i]
+                
+                if current_low == window_low:
+                    # Kiểm tra bounce từ vùng này
+                    bounced = (
+                        df['close'].iloc[i] > window_low * 1.005 and
+                        df['volume'].iloc[i] > df['volume'].iloc[i-lookback:i].mean()
+                    )
+                    if bounced:
+                        demand_zones.append(i)
+            except (IndexError, KeyError) as e:
+                self.logger.warning(f"Index error in demand zone detection at index {i}: {e}")
+                continue
         
         # Tính khoảng cách từ giá hiện tại đến các zone gần nhất
         df['distance_to_nearest_supply'] = float('inf')
@@ -1033,21 +1041,25 @@ class AdvancedFeatureEngineer:
         
         # Tìm các swing highs và lows
         for i in range(5, len(df) - 5):
-            if i >= len(df) - 5:
+            if i >= len(df) - 5 or i < 5:
                 break
-            # Bullish divergence: giá tạo lower low nhưng RSI tạo higher low
-            if (i-5 >= 0 and i+10 < len(df) and
-                df['low'].iloc[i] < df['low'].iloc[i-5:i].min() and
-                df['low'].iloc[i+5:i+10].max() < df['low'].iloc[i] and
-                df['rsi'].iloc[i] > df['rsi'].iloc[i-5:i].mean()):
-                df['bullish_rsi_div'].iloc[i] = 1
-            
-            # Bearish divergence: giá tạo higher high nhưng RSI tạo lower high
-            if (i-5 >= 0 and i+10 < len(df) and
-                df['high'].iloc[i] > df['high'].iloc[i-5:i].max() and
-                df['high'].iloc[i+5:i+10].min() > df['high'].iloc[i] and
-                df['rsi'].iloc[i] < df['rsi'].iloc[i-5:i].mean()):
-                df['bearish_rsi_div'].iloc[i] = 1
+            try:
+                # Bullish divergence: giá tạo lower low nhưng RSI tạo higher low
+                if (i-5 >= 0 and i+10 < len(df) and
+                    df['low'].iloc[i] < df['low'].iloc[i-5:i].min() and
+                    df['low'].iloc[i+5:i+10].max() < df['low'].iloc[i] and
+                    df['rsi'].iloc[i] > df['rsi'].iloc[i-5:i].mean()):
+                    df['bullish_rsi_div'].iloc[i] = 1
+                
+                # Bearish divergence: giá tạo higher high nhưng RSI tạo lower high
+                if (i-5 >= 0 and i+10 < len(df) and
+                    df['high'].iloc[i] > df['high'].iloc[i-5:i].max() and
+                    df['high'].iloc[i+5:i+10].min() > df['high'].iloc[i] and
+                    df['rsi'].iloc[i] < df['rsi'].iloc[i-5:i].mean()):
+                    df['bearish_rsi_div'].iloc[i] = 1
+            except (IndexError, KeyError) as e:
+                self.logger.warning(f"Index error in RSI divergence detection at index {i}: {e}")
+                continue
         
         return df
     
@@ -1713,9 +1725,12 @@ class EnsembleModel:
     def predict(self, X: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
         """Dự đoán với ensemble"""
         
+        # Clean input data first
+        X_clean = self._clean_training_data(X)
+        
         # Ensure prediction features match training features
         try:
-            X_normalized = self._normalize_prediction_features(X)
+            X_normalized = self._normalize_prediction_features(X_clean)
         except Exception as e:
             self.logger.warning(f"Feature normalization failed: {e}")
             return np.zeros(len(X)), np.ones(len(X)) * 0.5
@@ -2025,7 +2040,18 @@ class LSTMModel:
             
             # Evaluate
             try:
-                val_loss, val_acc, val_prec, val_rec = self.model.evaluate(X_val_seq, y_val_seq, verbose=0)
+                eval_results = self.model.evaluate(X_val_seq, y_val_seq, verbose=0)
+                
+                # Handle different return formats from model.evaluate()
+                if len(eval_results) == 2:
+                    val_loss, val_acc = eval_results
+                    val_prec, val_rec = 0.0, 0.0
+                elif len(eval_results) == 4:
+                    val_loss, val_acc, val_prec, val_rec = eval_results
+                else:
+                    val_loss = eval_results[0] if len(eval_results) > 0 else 0.0
+                    val_acc = eval_results[1] if len(eval_results) > 1 else 0.0
+                    val_prec, val_rec = 0.0, 0.0
                 
                 self.logger.info(f"LSTM Training completed - Val Acc: {val_acc:.3f}, Val Loss: {val_loss:.3f}")
                 
@@ -2051,8 +2077,11 @@ class LSTMModel:
             self.logger.warning("LSTM model chưa được huấn luyện")
             return np.zeros(len(X)), np.zeros(len(X))
         
+        # Clean input data first
+        X_clean = self._clean_data(X)
+        
         # Ensure feature consistency with training data
-        X = self.ensure_feature_consistency(X)
+        X = self.ensure_feature_consistency(X_clean)
         
         # Prepare sequences - ensure X has the same column order as during training
         if hasattr(self, 'scaler_feature_names'):
@@ -2083,6 +2112,28 @@ class LSTMModel:
         full_probabilities[self.sequence_length:] = probabilities
         
         return full_predictions, full_probabilities
+    
+    def _clean_data(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Clean input data by handling infinity and NaN values"""
+        X_clean = X.copy()
+        
+        # Replace infinity values with NaN
+        X_clean = X_clean.replace([np.inf, -np.inf], np.nan)
+        
+        # Fill NaN values with median for numeric columns
+        for col in X_clean.select_dtypes(include=[np.number]).columns:
+            if X_clean[col].isnull().any():
+                median_val = X_clean[col].median()
+                if pd.isna(median_val):
+                    # If median is also NaN, use 0
+                    median_val = 0
+                X_clean[col] = X_clean[col].fillna(median_val)
+        
+        # Ensure all values are finite
+        X_clean = X_clean.replace([np.inf, -np.inf], np.nan)
+        X_clean = X_clean.fillna(0)
+        
+        return X_clean
     
     def ensure_feature_consistency(self, X: pd.DataFrame) -> pd.DataFrame:
         """Ensure feature consistency with training data"""
@@ -2345,8 +2396,11 @@ class RealTradingEnv(gym.Env):
         
         return obs, reward, done, info
     
-    def reset(self):
+    def reset(self, seed=None, options=None):
         """Reset environment to initial state"""
+        if seed is not None:
+            np.random.seed(seed)
+        
         self.current_step = 0
         self.position = 0
         self.entry_price = 0.0
