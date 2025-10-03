@@ -967,9 +967,15 @@ class AdvancedFeatureEngineer:
         # Tìm các vùng Supply (kháng cự) và Demand (hỗ trợ)
         lookback = 20
         
+        # Initialize supply/demand features
+        df['distance_to_nearest_supply'] = 0.0
+        df['distance_to_nearest_demand'] = 0.0
+        
         # Supply zones: các đỉnh với rejection
         supply_zones = []
         for i in range(lookback, len(df)):
+            if i >= len(df):
+                break
             window_high = df['high'].iloc[i-lookback:i].max()
             current_high = df['high'].iloc[i]
             
@@ -985,6 +991,8 @@ class AdvancedFeatureEngineer:
         # Demand zones: các đáy với bounce
         demand_zones = []
         for i in range(lookback, len(df)):
+            if i >= len(df):
+                break
             window_low = df['low'].iloc[i-lookback:i].min()
             current_low = df['low'].iloc[i]
             
@@ -1025,14 +1033,18 @@ class AdvancedFeatureEngineer:
         
         # Tìm các swing highs và lows
         for i in range(5, len(df) - 5):
+            if i >= len(df) - 5:
+                break
             # Bullish divergence: giá tạo lower low nhưng RSI tạo higher low
-            if (df['low'].iloc[i] < df['low'].iloc[i-5:i].min() and
+            if (i-5 >= 0 and i+10 < len(df) and
+                df['low'].iloc[i] < df['low'].iloc[i-5:i].min() and
                 df['low'].iloc[i+5:i+10].max() < df['low'].iloc[i] and
                 df['rsi'].iloc[i] > df['rsi'].iloc[i-5:i].mean()):
                 df['bullish_rsi_div'].iloc[i] = 1
             
             # Bearish divergence: giá tạo higher high nhưng RSI tạo lower high
-            if (df['high'].iloc[i] > df['high'].iloc[i-5:i].max() and
+            if (i-5 >= 0 and i+10 < len(df) and
+                df['high'].iloc[i] > df['high'].iloc[i-5:i].max() and
                 df['high'].iloc[i+5:i+10].min() > df['high'].iloc[i] and
                 df['rsi'].iloc[i] < df['rsi'].iloc[i-5:i].mean()):
                 df['bearish_rsi_div'].iloc[i] = 1
@@ -1447,6 +1459,28 @@ class EnsembleModel:
         self.logger.info(f"Best {model_name} params: {study.best_params}")
         return study.best_params
     
+    def _clean_training_data(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Clean training data by handling infinity and NaN values"""
+        X_clean = X.copy()
+        
+        # Replace infinity values with NaN
+        X_clean = X_clean.replace([np.inf, -np.inf], np.nan)
+        
+        # Fill NaN values with median for numeric columns
+        for col in X_clean.select_dtypes(include=[np.number]).columns:
+            if X_clean[col].isnull().any():
+                median_val = X_clean[col].median()
+                if pd.isna(median_val):
+                    # If median is also NaN, use 0
+                    median_val = 0
+                X_clean[col] = X_clean[col].fillna(median_val)
+        
+        # Ensure all values are finite
+        X_clean = X_clean.replace([np.inf, -np.inf], np.nan)
+        X_clean = X_clean.fillna(0)
+        
+        return X_clean
+    
     def train_ensemble(self, X_train: pd.DataFrame, y_train: pd.Series) -> Dict[str, float]:
         """Huấn luyện ensemble models với optimized parameters"""
         
@@ -1463,6 +1497,23 @@ class EnsembleModel:
             if len(X_train) < 10:
                 self.logger.error(f"Insufficient training data: {len(X_train)} samples")
                 return {'error': 'Insufficient training data'}
+            
+            # Clean data - handle infinity and NaN values
+            X_train_clean = self._clean_training_data(X_train)
+            y_train_clean = y_train.copy()
+            
+            # Align cleaned data
+            valid_indices = ~X_train_clean.isnull().any(axis=1)
+            X_train_clean = X_train_clean[valid_indices]
+            y_train_clean = y_train_clean[valid_indices]
+            
+            if len(X_train_clean) < 10:
+                self.logger.error(f"Insufficient clean training data: {len(X_train_clean)} samples")
+                return {'error': 'Insufficient clean training data'}
+            
+            # Use cleaned data
+            X_train = X_train_clean
+            y_train = y_train_clean
             
             # Store feature names for consistency during prediction
             self.feature_names = list(X_train.columns)
@@ -1512,33 +1563,28 @@ class EnsembleModel:
                     base_predictions[:, i*3:(i+1)*3] = np.full((len(X_train), 3), 1/3)
                     continue
                 
-                # Calibrate probabilities with error handling
-                try:
-                    calibrated_model = CalibratedClassifierCV(model, method='sigmoid', cv=3)
-                    calibrated_model.fit(X_train, y_train)
-                    
-                    # Verify calibration was successful by checking if calibrated_classifiers_ exist
-                    if not hasattr(calibrated_model, 'calibrated_classifiers_') or len(calibrated_model.calibrated_classifiers_) == 0:
-                        raise ValueError("Calibration failed - no calibrated classifiers found")
-                    
-                    self.logger.info(f"Sử dụng calibrated model cho {model_name}")
-                except Exception as calib_error:
-                    self.logger.warning(f"Calibration failed for {model_name}: {calib_error}")
-                    self.logger.info(f"Sử dụng model gốc cho {model_name}")
-                    # Fallback to original model
-                    calibrated_model = model
-                    calibrated_model.fit(X_train, y_train)
-                
-                self.models[model_name] = calibrated_model
+                # Store trained model
+                self.models[model_name] = model
                 
                 # Get predictions for meta-model - Updated for multi-class
-                if hasattr(calibrated_model, 'predict_proba'):
-                    predictions = calibrated_model.predict_proba(X_train)
-                    # Store all class probabilities
-                    base_predictions[:, i*3:(i+1)*3] = predictions
+                if hasattr(model, 'predict_proba'):
+                    predictions = model.predict_proba(X_train)
+                    # Ensure predictions have the right shape for multi-class
+                    if predictions.shape[1] == 3:
+                        base_predictions[:, i*3:(i+1)*3] = predictions
+                    else:
+                        # Handle binary classification case
+                        if predictions.shape[1] == 2:
+                            # Convert binary to 3-class: [prob_class0, prob_class1, 0]
+                            three_class_pred = np.zeros((predictions.shape[0], 3))
+                            three_class_pred[:, :2] = predictions
+                            base_predictions[:, i*3:(i+1)*3] = three_class_pred
+                        else:
+                            # Fallback: uniform distribution
+                            base_predictions[:, i*3:(i+1)*3] = np.full((len(X_train), 3), 1/3)
                 else:
                     # Fallback for models without predict_proba
-                    predictions = calibrated_model.predict(X_train)
+                    predictions = model.predict(X_train)
                     # Convert to one-hot encoding
                     one_hot = np.zeros((len(predictions), 3))
                     for j, pred in enumerate(predictions):
@@ -1549,11 +1595,7 @@ class EnsembleModel:
                     base_predictions[:, i*3:(i+1)*3] = one_hot
                 
                 # Calculate feature importance
-                estimator_to_check = None
-                if hasattr(calibrated_model, 'estimator_') and calibrated_model.estimator_ is not None:
-                    estimator_to_check = calibrated_model.estimator_
-                else:
-                    estimator_to_check = calibrated_model
+                estimator_to_check = model
                 
                 if hasattr(estimator_to_check, 'feature_importances_'):
                     self.feature_importance[model_name] = estimator_to_check.feature_importances_
@@ -1839,6 +1881,28 @@ class LSTMModel:
         
         return X_array, y_array
     
+    def _clean_training_data(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Clean training data by handling infinity and NaN values"""
+        X_clean = X.copy()
+        
+        # Replace infinity values with NaN
+        X_clean = X_clean.replace([np.inf, -np.inf], np.nan)
+        
+        # Fill NaN values with median for numeric columns
+        for col in X_clean.select_dtypes(include=[np.number]).columns:
+            if X_clean[col].isnull().any():
+                median_val = X_clean[col].median()
+                if pd.isna(median_val):
+                    # If median is also NaN, use 0
+                    median_val = 0
+                X_clean[col] = X_clean[col].fillna(median_val)
+        
+        # Ensure all values are finite
+        X_clean = X_clean.replace([np.inf, -np.inf], np.nan)
+        X_clean = X_clean.fillna(0)
+        
+        return X_clean
+    
     def train(self, X: pd.DataFrame, y: pd.Series, 
               validation_split: float = 0.2, epochs: int = 100) -> Dict[str, float]:
         """Huấn luyện LSTM model"""
@@ -1856,6 +1920,23 @@ class LSTMModel:
             if len(X) < self.sequence_length + 10:
                 self.logger.error(f"Insufficient training data for LSTM: {len(X)} samples (need at least {self.sequence_length + 10})")
                 return {'error': 'Insufficient training data'}
+            
+            # Clean data - handle infinity and NaN values
+            X_clean = self._clean_training_data(X)
+            y_clean = y.copy()
+            
+            # Align cleaned data
+            valid_indices = ~X_clean.isnull().any(axis=1)
+            X_clean = X_clean[valid_indices]
+            y_clean = y_clean[valid_indices]
+            
+            if len(X_clean) < self.sequence_length + 10:
+                self.logger.error(f"Insufficient clean training data for LSTM: {len(X_clean)} samples")
+                return {'error': 'Insufficient clean training data'}
+            
+            # Use cleaned data
+            X = X_clean
+            y = y_clean
             
             self.logger.info(f"LSTM training with {len(X)} samples, {X.shape[1]} features")
             
@@ -2042,8 +2123,11 @@ class PortfolioEnvironment(gym.Env):
         # Portfolio state
         self.reset()
     
-    def reset(self):
+    def reset(self, seed=None, options=None):
         """Reset environment"""
+        if seed is not None:
+            np.random.seed(seed)
+        
         self.current_step = Config.FEATURE_WINDOW
         self.portfolio_value = 100000  # Starting value $100k
         self.cash = 100000
@@ -2051,7 +2135,10 @@ class PortfolioEnvironment(gym.Env):
         self.trade_history = []
         self.daily_returns = []
         
-        return self._get_observation()
+        observation = self._get_observation()
+        info = {}
+        
+        return observation, info
     
     def _get_observation(self) -> np.ndarray:
         """Lấy observation state"""
