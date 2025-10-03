@@ -1360,16 +1360,18 @@ class EnsembleModel:
         self.cv_scorer = sklearn.metrics.make_scorer(sklearn.metrics.accuracy_score)
         self.cv_splitter = PurgedGroupTimeSeriesSplit(n_splits=5, gap=10)
         
-        # Models với Optuna optimization
+        # Models với Optuna optimization - Updated for multi-class classification
         self.model_configs = {
             'xgboost': {
-                'objective': 'binary:logistic',
-                'eval_metric': 'logloss',
+                'objective': 'multi:softmax',
+                'eval_metric': 'mlogloss',
+                'num_class': 3,  # 3 classes: 0=SELL, 1=BUY, 2=HOLD
                 'seed': 42
             },
             'lightgbm': {
-                'objective': 'binary',
-                'metric': 'binary_logloss',
+                'objective': 'multiclass',
+                'metric': 'multi_logloss',
+                'num_class': 3,  # 3 classes: 0=SELL, 1=BUY, 2=HOLD
                 'random_seed': 42,
                 'verbose': -1
             },
@@ -1476,8 +1478,8 @@ class EnsembleModel:
                     self.logger.error(f"Lỗi getting parameters {model_name}: {e}")
                     optimized_params[model_name] = self.model_configs[model_name]
             
-            # Train models với optimized parameters
-            base_predictions = np.zeros((len(X_train), len(optimized_params)))
+            # Train models với optimized parameters - Updated for multi-class
+            base_predictions = np.zeros((len(X_train), len(optimized_params) * 3))  # 3 classes per model
             
             for i, (model_name, params) in enumerate(optimized_params.items()):
                 try:
@@ -1492,9 +1494,11 @@ class EnsembleModel:
                     # Train model
                     model.fit(X_train, y_train)
                     
-                    # Get predictions
-                    pred_proba = model.predict_proba(X_train)[:, 1]
-                    base_predictions[:, i] = pred_proba
+                    # Get predictions for multi-class - store all class probabilities
+                    pred_proba = model.predict_proba(X_train)
+                    # For multi-class, we need to store probabilities for all classes
+                    # Reshape to store 3 classes per model
+                    base_predictions[:, i*3:(i+1)*3] = pred_proba
                     
                     # Store trained model
                     self.models[model_name] = model
@@ -1502,8 +1506,8 @@ class EnsembleModel:
                     
                 except Exception as e:
                     self.logger.error(f"Failed to train {model_name}: {e}")
-                    # Fill with zeros if training fails
-                    base_predictions[:, i] = 0.5
+                    # Fill with uniform distribution if training fails
+                    base_predictions[:, i*3:(i+1)*3] = np.full((len(X_train), 3), 1/3)
                     continue
                 
                 # Calibrate probabilities with error handling
@@ -1525,16 +1529,22 @@ class EnsembleModel:
                 
                 self.models[model_name] = calibrated_model
                 
-                # Get predictions for meta-model
+                # Get predictions for meta-model - Updated for multi-class
                 if hasattr(calibrated_model, 'predict_proba'):
-                    predictions = calibrated_model.predict_proba(X_train)[:, 1]
+                    predictions = calibrated_model.predict_proba(X_train)
+                    # Store all class probabilities
+                    base_predictions[:, i*3:(i+1)*3] = predictions
                 else:
-                    predictions = calibrated_model.decision_function(X_train)
-                    # Convert to probabilities
-                    scaler = MinMaxScaler()
-                    predictions = scaler.fit_transform(predictions.reshape(-1, 1)).flatten()
-                
-                base_predictions[:, i] = predictions
+                    # Fallback for models without predict_proba
+                    predictions = calibrated_model.predict(X_train)
+                    # Convert to one-hot encoding
+                    one_hot = np.zeros((len(predictions), 3))
+                    for j, pred in enumerate(predictions):
+                        if 0 <= pred < 3:  # Ensure valid class
+                            one_hot[j, int(pred)] = 1.0
+                        else:
+                            one_hot[j, 2] = 1.0  # Default to HOLD
+                    base_predictions[:, i*3:(i+1)*3] = one_hot
                 
                 # Calculate feature importance
                 estimator_to_check = None
@@ -1644,31 +1654,41 @@ class EnsembleModel:
             self.logger.warning(f"Feature normalization failed: {e}")
             return np.zeros(len(X)), np.ones(len(X)) * 0.5
         
-        # Base model predictions
-        base_predictions = np.zeros((len(X_normalized), len(self.models)))
+        # Base model predictions - Updated for multi-class
+        # For multi-class, we need to store probabilities for each class
+        base_predictions = np.zeros((len(X_normalized), len(self.models) * 3))  # 3 classes per model
         
         for i, (name, model) in enumerate(self.models.items()):
             try:
                 if hasattr(model, 'predict_proba'):
-                    base_predictions[:, i] = model.predict_proba(X_normalized)[:, 1]
+                    # Get probabilities for all 3 classes
+                    class_probs = model.predict_proba(X_normalized)
+                    # Store probabilities for each class
+                    base_predictions[:, i*3:(i+1)*3] = class_probs
                 else:
-                    # Fallback to decision function if predict_proba is not available
-                    predictions = model.decision_function(X_normalized)
-                    scaler = MinMaxScaler()
-                    predictions = scaler.fit_transform(predictions.reshape(-1, 1)).flatten()
-                    base_predictions[:, i] = predictions
+                    # Fallback for models without predict_proba
+                    predictions = model.predict(X_normalized)
+                    # Convert to one-hot encoding
+                    one_hot = np.zeros((len(predictions), 3))
+                    for j, pred in enumerate(predictions):
+                        if 0 <= pred < 3:  # Ensure valid class
+                            one_hot[j, int(pred)] = 1.0
+                        else:
+                            one_hot[j, 2] = 1.0  # Default to HOLD
+                    base_predictions[:, i*3:(i+1)*3] = one_hot
             except Exception as e:
                 self.logger.error(f"Error predicting with {name}: {e}")
-                # Use average of other models as fallback
-                if i > 0:
-                    base_predictions[:, i] = np.mean(base_predictions[:, :i], axis=1)
-                else:
-                    base_predictions[:, i] = 0.5  # Default probability
+                # Use uniform distribution as fallback
+                base_predictions[:, i*3:(i+1)*3] = np.full((len(X_normalized), 3), 1/3)
         
         # Meta-model prediction
         meta_predictions = self.meta_model.predict_proba(base_predictions)
         
-        return np.argmax(meta_predictions, axis=1), meta_predictions[:, 1]
+        # Return predicted class and confidence (max probability)
+        predicted_classes = np.argmax(meta_predictions, axis=1)
+        confidence_scores = np.max(meta_predictions, axis=1)
+        
+        return predicted_classes, confidence_scores
     
     def _normalize_prediction_features(self, X: pd.DataFrame) -> pd.DataFrame:
         """Normalize prediction features to match training features"""
@@ -1749,8 +1769,8 @@ class LSTMModel:
         dense2 = Dense(32, activation='relu')(dense1_drop)
         dense2_drop = Dropout(0.2)(dense2)
         
-        # Output layer
-        output = Dense(1, activation='sigmoid', name='prediction')(dense2_drop)
+        # Output layer - 3 classes: 0=SELL, 1=BUY, 2=HOLD
+        output = Dense(3, activation='softmax', name='prediction')(dense2_drop)
         
         # Create model
         self.model = Model(inputs=inputs, outputs=output)
@@ -1759,8 +1779,8 @@ class LSTMModel:
         optimizer = Adam(learning_rate=0.001, clipnorm=1.0)
         self.model.compile(
             optimizer=optimizer,
-            loss='binary_crossentropy',
-            metrics=['accuracy', 'precision', 'recall']
+            loss='sparse_categorical_crossentropy',
+            metrics=['accuracy']
         )
         
         self.logger.info("Đã xây dựng kiến trúc LSTM với Attention")
@@ -1943,9 +1963,12 @@ class LSTMModel:
         
         X_seq = np.array(X_sequences)
         
-        # Predict
-        probabilities = self.model.predict(X_seq, verbose=0).flatten()
-        predictions = (probabilities > 0.5).astype(int)
+        # Predict - get probabilities for 3 classes
+        class_probabilities = self.model.predict(X_seq, verbose=0)
+        
+        # Get predicted class (argmax) and confidence (max probability)
+        predictions = np.argmax(class_probabilities, axis=1)
+        probabilities = np.max(class_probabilities, axis=1)
         
         # Pad với zeros cho các điểm đầu
         full_predictions = np.zeros(len(X))
@@ -4597,26 +4620,88 @@ class TradingBotController:
             return {}
     
     def _create_training_targets(self, df: pd.DataFrame) -> Optional[pd.Series]:
-        """Create training targets from price data"""
+        """Create training targets using Triple-Barrier Method"""
         
         try:
-            if len(df) < 2 or 'close' not in df.columns:
+            if len(df) < 20 or 'close' not in df.columns or 'high' not in df.columns or 'low' not in df.columns:
                 return None
+            
+            # Calculate ATR (Average True Range) for volatility measurement
+            def calculate_atr(df, period=14):
+                """Calculate ATR using pandas operations"""
+                high_low = df['high'] - df['low']
+                high_close_prev = abs(df['high'] - df['close'].shift(1))
+                low_close_prev = abs(df['low'] - df['close'].shift(1))
                 
-            # Simple target: 1 if next price is higher, 0 otherwise
+                true_range = pd.concat([high_low, high_close_prev, low_close_prev], axis=1).max(axis=1)
+                atr = true_range.rolling(window=period).mean()
+                return atr
+            
+            # Calculate ATR
+            atr = calculate_atr(df)
+            
+            # Triple-Barrier Method parameters
+            take_profit_multiplier = 2.0  # ATR multiplier for take profit
+            stop_loss_multiplier = 1.5   # ATR multiplier for stop loss
+            time_barrier = 10            # Number of candles to look ahead
+            
             targets = []
-            for i in range(len(df) - 1):
+            
+            # Process each candle
+            for i in range(len(df) - time_barrier):
                 current_price = df['close'].iloc[i]
-                next_price = df['close'].iloc[i + 1]
-                targets.append(1 if next_price > current_price else 0)
+                current_atr = atr.iloc[i]
+                
+                # Skip if ATR is not available (NaN)
+                if pd.isna(current_atr) or current_atr == 0:
+                    targets.append(2)  # Default to HOLD
+                    continue
+                
+                # Define barriers
+                take_profit_barrier = current_price + (current_atr * take_profit_multiplier)
+                stop_loss_barrier = current_price - (current_atr * stop_loss_multiplier)
+                
+                # Look ahead for the next N candles
+                take_profit_hit = False
+                stop_loss_hit = False
+                
+                for j in range(i + 1, min(i + 1 + time_barrier, len(df))):
+                    candle_high = df['high'].iloc[j]
+                    candle_low = df['low'].iloc[j]
+                    
+                    # Check if take profit barrier is hit first
+                    if candle_high >= take_profit_barrier and not stop_loss_hit:
+                        take_profit_hit = True
+                        break
+                    
+                    # Check if stop loss barrier is hit first
+                    if candle_low <= stop_loss_barrier and not take_profit_hit:
+                        stop_loss_hit = True
+                        break
+                
+                # Assign labels based on barrier hits
+                if take_profit_hit:
+                    targets.append(1)  # BUY signal
+                elif stop_loss_hit:
+                    targets.append(0)  # SELL signal
+                else:
+                    targets.append(2)  # HOLD signal
             
-            # Add placeholder for last element to maintain alignment
-            targets.append(0)
+            # Add placeholder targets for the last N candles (can't look ahead)
+            for _ in range(time_barrier):
+                targets.append(2)  # Default to HOLD for last candles
             
-            return pd.Series(targets, name='target', index=df.index)
+            # Create Series with proper index
+            target_series = pd.Series(targets, name='target', index=df.index)
+            
+            # Log target distribution for monitoring
+            target_counts = target_series.value_counts()
+            self.logger.info(f"Training targets distribution: {target_counts.to_dict()}")
+            
+            return target_series
             
         except Exception as e:
-            self.logger.error(f"Error creating training targets: {e}")
+            self.logger.error(f"Error creating training targets with Triple-Barrier Method: {e}")
             return None
     
     async def _update_models_with_new_data(self, enriched_data: Dict[str, pd.DataFrame]):
