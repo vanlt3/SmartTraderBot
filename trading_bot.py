@@ -1594,23 +1594,22 @@ class LSTMModel:
         # Input layer
         inputs = Input(shape=(self.sequence_length, self.feature_dim), name='input_sequences')
         
-        # Batch normalization
-        bn_input = BatchNormalization(axis=-1)(inputs)
-        
         # First LSTM layer with dropout
-        lstm1 = LSTM(128, return_sequences=True, dropout=0.2, recurrent_dropout=0.2)(bn_input)
-        lstm1_bn = BatchNormalization(axis=-1)(lstm1)
+        lstm1 = LSTM(128, return_sequences=True, dropout=0.2, recurrent_dropout=0.2)(inputs)
         
         # Attention mechanism
         attention = tf.keras.layers.MultiHeadAttention(
             num_heads=8, 
             key_dim=128,
             dropout=0.1
-        )(lstm1_bn, lstm1_bn)
+        )(lstm1, lstm1)
+        
+        # Batch normalization after attention
+        attention_bn = BatchNormalization()(attention)
         
         # Second LSTM layer
-        lstm2 = LSTM(64, return_sequences=False, dropout=0.2, recurrent_dropout=0.2)(attention)
-        lstm2_bn = BatchNormalization(axis=-1)(lstm2)
+        lstm2 = LSTM(64, return_sequences=False, dropout=0.2, recurrent_dropout=0.2)(attention_bn)
+        lstm2_bn = BatchNormalization()(lstm2)
         
         # Dense layers
         dense1 = Dense(64, activation='relu')(lstm2_bn)
@@ -1652,16 +1651,30 @@ class LSTMModel:
         if self.model is None:
             self._build_model()
         
+        # Ensure y has the same length as X_scaled after scaling
+        if len(y) != len(X_scaled):
+            self.logger.warning(f"Target length ({len(y)}) doesn't match feature length ({len(X_scaled)})")
+            min_len = min(len(y), len(X_scaled))
+            X_scaled = X_scaled[:min_len]
+            y = y[:min_len]
+        
         # Create sequences
         X_sequences = []
         y_sequences = []
         
         for i in range(self.sequence_length, len(X_scaled)):
             X_sequences.append(X_scaled[i-self.sequence_length:i])
-            if i < len(y):  # Check bounds to prevent index error
-                y_sequences.append(y.iloc[i])
+            y_sequences.append(y.iloc[i])
         
-        return np.array(X_sequences), np.array(y_sequences)
+        # Convert to numpy arrays
+        X_array = np.array(X_sequences)
+        y_array = np.array(y_sequences)
+        
+        # Ensure targets are properly shaped for binary classification
+        if y_array.ndim == 1:
+            y_array = y_array.reshape(-1, 1)
+        
+        return X_array, y_array
     
     def train(self, X: pd.DataFrame, y: pd.Series, 
               validation_split: float = 0.2, epochs: int = 100) -> Dict[str, float]:
@@ -1678,6 +1691,14 @@ class LSTMModel:
         if X_seq.shape[1] != self.sequence_length:
             self.logger.error(f"Sequence length mismatch: expected {self.sequence_length}, got {X_seq.shape[1]}")
             return {'error': 'Data preprocessing error'}
+        
+        # Validate tensor shapes
+        self.logger.info(f"Training data shapes: X_seq={X_seq.shape}, y_seq={y_seq.shape}")
+        
+        # Ensure y_seq has proper shape for binary classification
+        if y_seq.shape != (X_seq.shape[0], 1):
+            self.logger.warning(f"Reshaping y_seq from {y_seq.shape} to ({X_seq.shape[0]}, 1)")
+            y_seq = y_seq.reshape(X_seq.shape[0], 1)
         
         # Split data
         split_idx = int(len(X_seq) * (1 - validation_split))
@@ -1701,28 +1722,37 @@ class LSTMModel:
         )
         
         # Train model
-        history = self.model.fit(
-            X_train_seq, y_train_seq,
-            validation_data=(X_val_seq, y_val_seq),
-            epochs=epochs,
-            batch_size=32,
-            callbacks=[early_stopping, reduce_lr],
-            verbose=1
-        )
+        try:
+            history = self.model.fit(
+                X_train_seq, y_train_seq,
+                validation_data=(X_val_seq, y_val_seq),
+                epochs=epochs,
+                batch_size=32,
+                callbacks=[early_stopping, reduce_lr],
+                verbose=1
+            )
+        except Exception as e:
+            self.logger.error(f"Model training error: {e}")
+            return {'error': f'Training failed: {str(e)}'}
         
         self.is_trained = True
         
         # Evaluate
-        val_loss, val_acc, val_prec, val_rec = self.model.evaluate(X_val_seq, y_val_seq, verbose=0)
-        
-        self.logger.info(f"LSTM Training completed - Val Acc: {val_acc:.3f}, Val Loss: {val_loss:.3f}")
-        
-        return {
-            'val_accuracy': val_acc,
-            'val_loss': val_loss,
-            'val_precision': val_prec,
-            'val_recall': val_rec
-        }
+        try:
+            val_loss, val_acc, val_prec, val_rec = self.model.evaluate(X_val_seq, y_val_seq, verbose=0)
+            
+            self.logger.info(f"LSTM Training completed - Val Acc: {val_acc:.3f}, Val Loss: {val_loss:.3f}")
+            
+            return {
+                'training_completed': True,
+                'val_accuracy': val_acc,
+                'val_loss': val_loss,
+                'val_precision': val_prec,
+                'val_recall': val_rec
+            }
+        except Exception as e:
+            self.logger.warning(f"Evaluation failed: {e}")
+            return {'training_completed': True, 'evaluation_failed': str(e)}
     
     def predict(self, X: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
         """Dự đoán với LSTM model"""
@@ -3656,7 +3686,6 @@ class TradingBotController:
         
         try:
             import sqlite3
-            from datetime import datetime
             
             conn = sqlite3.connect(Config.DB_PATH)
             cursor = conn.cursor()
@@ -4047,12 +4076,17 @@ class TradingBotController:
                             features_df = df.select_dtypes(include=[np.number]).dropna()
                             if len(features_df) > 50:
                                 targets = self._create_training_targets(df)
-                                if targets is not None:
+                                if targets is not None and len(targets) == len(features_df):
+                                    self.logger.info(f"Training LSTM model with {symbol}: features shape={features_df.shape}, targets shape={targets.shape}")
                                     # Train LSTM model
                                     training_result = self.lstm_model.train(features_df, targets)
                                     if training_result.get('training_completed', False):
                                         self.logger.info("✅ LSTM model trained successfully!")
                                         break
+                                    else:
+                                        self.logger.warning(f"Training failed for {symbol}: {training_result}")
+                                else:
+                                    self.logger.warning(f"Skipping {symbol}: features/{len(features_df)}, targets/{len(targets) if targets is not None else 'None'}")
                 except Exception as e:
                     self.logger.warning(f"LSTM model training failed: {e}")
             
@@ -4092,7 +4126,7 @@ class TradingBotController:
         """Create training targets from price data"""
         
         try:
-            if len(df) < 2:
+            if len(df) < 2 or 'close' not in df.columns:
                 return None
                 
             # Simple target: 1 if next price is higher, 0 otherwise
@@ -4102,9 +4136,13 @@ class TradingBotController:
                 next_price = df['close'].iloc[i + 1]
                 targets.append(1 if next_price > current_price else 0)
             
-            return pd.Series(targets, name='target')
+            # Add placeholder for last element to maintain alignment
+            targets.append(0)
             
-        except Exception:
+            return pd.Series(targets, name='target', index=df.index)
+            
+        except Exception as e:
+            self.logger.error(f"Error creating training targets: {e}")
             return None
     
     async def _update_models_with_new_data(self, enriched_data: Dict[str, pd.DataFrame]):
