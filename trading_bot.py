@@ -3839,10 +3839,8 @@ class RealTimeMonitor:
                             should_close = True
                             close_reason = "Take Profit"
                     
-                    # Weekend closure for non-crypto
-                    if symbol != 'BTCUSD' and self._is_weekend_current_close():
-                        should_close = True
-                        close_reason = "Weekend Auto Close"
+                    # Weekend closure for non-crypto - now handled by MarketStatusChecker
+                    # This logic has been moved to the main trading cycle
                     
                     if should_close:
                         positions_to_close.append({
@@ -3928,14 +3926,106 @@ class RealTimeMonitor:
         except Exception as e:
             self.logger.error(f"Lỗi đóng position {symbol}: {e}")
     
-    def _is_weekend_current_close(self) -> bool:
-        """Kiểm tra có đóng toàn bộ positions vào cuối tuần không"""
+
+# ===== MARKET STATUS CHECKER =====
+class MarketStatusChecker:
+    """Kiểm tra trạng thái mở/đóng cửa của các thị trường"""
+    
+    def __init__(self):
+        self.logger = LOG_MANAGER.get_logger('MarketStatusChecker')
         
-        now = datetime.now()
-        # Đóng positions vào thứ 6 sau 22:00 UTC
-        if now.weekday() == 4 and now.hour >= 22:  # Friday 22:00+
-            return True
-        return False
+        # Import pandas_market_calendars
+        try:
+            import pandas_market_calendars as pmc
+            self.pmc = pmc
+        except ImportError:
+            self.logger.error("pandas_market_calendars not installed. Please install it: pip install pandas_market_calendars")
+            raise ImportError("pandas_market_calendars is required for market hours checking")
+        
+        # Initialize market calendars
+        self.calendars = {}
+        self.symbol_to_calendar = {}
+        
+        try:
+            # Initialize calendars for different markets
+            self.calendars['NYSE'] = pmc.get_calendar('NYSE')
+            self.calendars['NASDAQ'] = pmc.get_calendar('NASDAQ')
+            
+            # Map symbols to their respective calendars
+            self.symbol_to_calendar = {
+                'NAS100': self.calendars['NYSE'],  # NAS100 follows NYSE hours
+                'EURUSD': None,  # Forex - handled separately
+                'XAUUSD': None,  # Gold - handled separately  
+                'BTCUSD': None   # Crypto - 24/7
+            }
+            
+            self.logger.info("✅ Market calendars initialized successfully")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to initialize market calendars: {e}")
+            raise
+    
+    def is_market_open(self, symbol: str) -> bool:
+        """Kiểm tra thị trường có mở cửa không cho symbol cụ thể"""
+        
+        try:
+            now_utc = pd.Timestamp.utcnow()
+            
+            # Handle crypto (24/7 trading)
+            if symbol == 'BTCUSD':
+                return True
+            
+            # Handle Forex markets (EURUSD, XAUUSD)
+            if symbol in ['EURUSD', 'XAUUSD']:
+                return self._is_forex_market_open(now_utc)
+            
+            # Handle exchange-traded instruments (NAS100)
+            if symbol in self.symbol_to_calendar:
+                calendar = self.symbol_to_calendar[symbol]
+                if calendar is None:
+                    # Fallback to forex logic for unmapped symbols
+                    return self._is_forex_market_open(now_utc)
+                
+                # Check if market is open using pandas_market_calendars
+                is_open = calendar.is_open_on_minute(now_utc)
+                return is_open
+            
+            # Default fallback
+            self.logger.warning(f"Unknown symbol {symbol}, using forex logic")
+            return self._is_forex_market_open(now_utc)
+            
+        except Exception as e:
+            self.logger.error(f"Error checking market status for {symbol}: {e}")
+            # Default to closed on error for safety
+            return False
+    
+    def _is_forex_market_open(self, now_utc: pd.Timestamp) -> bool:
+        """Kiểm tra thị trường Forex có mở cửa không"""
+        
+        weekday = now_utc.weekday()  # 0=Monday, 6=Sunday
+        hour = now_utc.hour
+        
+        # Forex market logic:
+        # - Closed from Friday 21:00 UTC to Sunday 21:00 UTC
+        # - Open Monday 00:00 UTC to Friday 21:00 UTC
+        
+        if weekday == 4:  # Friday
+            return hour < 21  # Open until 21:00 UTC Friday
+        elif weekday == 5:  # Saturday
+            return False  # Always closed
+        elif weekday == 6:  # Sunday
+            return hour >= 21  # Open from 21:00 UTC Sunday
+        else:  # Monday to Thursday
+            return True  # Always open
+    
+    def get_market_status_summary(self) -> Dict[str, bool]:
+        """Lấy trạng thái của tất cả các thị trường"""
+        
+        status = {}
+        for symbol in Config.SYMBOLS:
+            status[symbol] = self.is_market_open(symbol)
+        
+        return status
 
 # ===== MAIN TRADING BOT CONTROLLER =====
 class TradingBotController:
@@ -3967,6 +4057,9 @@ class TradingBotController:
         
         # Observability
         self.discord_manager = DiscordNotificationManager()
+        
+        # Market Status Checker
+        self.market_checker = None
         
         # Performance tracking
         self.cycle_count = 0
@@ -4043,6 +4136,9 @@ class TradingBotController:
             
             # Initialize Risk Manager
             self.risk_manager = AdvancedRiskManager(self.api_manager)
+            
+            # Initialize Market Status Checker
+            self.market_checker = MarketStatusChecker()
             
             # Initialize Auto Retrain Manager
             self.auto_retrain_manager = AutoRetrainManager(self.ensemble_model, self.lstm_model)
@@ -4157,6 +4253,20 @@ class TradingBotController:
         
         try:
             self.logger.info(f"📈 Starting trading cycle #{self.cycle_count + 1}")
+            
+            # 0. Check market status before proceeding
+            if self.market_checker:
+                market_status = self.market_checker.get_market_status_summary()
+                open_markets = [symbol for symbol, is_open in market_status.items() if is_open]
+                closed_markets = [symbol for symbol, is_open in market_status.items() if not is_open]
+                
+                self.logger.info(f"Market Status - Open: {open_markets}, Closed: {closed_markets}")
+                
+                # If all markets are closed, pause for 1 hour
+                if not open_markets:
+                    self.logger.info("🌙 All markets are closed. Pausing for 1 hour.")
+                    await asyncio.sleep(3600)  # Sleep for 1 hour
+                    return
             
             # 1. Fetch fresh market data
             market_data = await self._fetch_all_market_data()

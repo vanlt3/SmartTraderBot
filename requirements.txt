@@ -25,6 +25,9 @@ stable-baselines3>=1.6.0
 # Technical Analysis
 ta>=0.10.0
 
+# Market Calendar
+pandas_market_calendars>=4.3.0
+
 # Online Learning
 river>=0.14.0
 
