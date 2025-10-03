@@ -696,7 +696,10 @@ class EnhancedDataManager:
             # Extract basic OHLC features
             features = []
             
-            # Recent OHLC data (relative to recent close)
+            # Recent OHLC data (relative to recent close) - add bounds checking
+            if len(df) == 0:
+                self.logger.warning(f"Empty DataFrame for {symbol}")
+                return None
             recent_close = df['close'].iloc[-1]
             
             # Normalize OHLC features
@@ -1742,8 +1745,20 @@ class EnsembleModel:
         for i, (name, model) in enumerate(self.models.items()):
             try:
                 if hasattr(model, 'predict_proba'):
-                    # Get probabilities for all 3 classes
+                    # Get probabilities for all classes
                     class_probs = model.predict_proba(X_normalized)
+                    # Ensure we have exactly 3 classes
+                    if class_probs.shape[1] == 2:
+                        # Convert binary to 3-class by adding HOLD probability
+                        binary_probs = class_probs
+                        class_probs = np.zeros((len(X_normalized), 3))
+                        class_probs[:, :2] = binary_probs
+                        class_probs[:, 2] = 0.1  # Small probability for HOLD
+                        # Renormalize
+                        class_probs = class_probs / class_probs.sum(axis=1, keepdims=True)
+                    elif class_probs.shape[1] != 3:
+                        # Fallback for unexpected number of classes
+                        class_probs = np.full((len(X_normalized), 3), 1/3)
                     # Store probabilities for each class
                     base_predictions[:, i*3:(i+1)*3] = class_probs
                 else:
@@ -2422,9 +2437,15 @@ class RealTradingEnv(gym.Env):
         
         # Get the latest row (most recent features)
         if len(features_df) > 0:
-            latest_features = features_df.iloc[-1]
-            # Select only numeric features
-            numeric_features = latest_features.select_dtypes(include=[np.number])
+            # Get only numeric columns from the DataFrame first, then get the latest row
+            numeric_df = features_df.select_dtypes(include=[np.number])
+            if len(numeric_df) > 0:
+                latest_features = numeric_df.iloc[-1]
+                numeric_features = latest_features
+            else:
+                # Fallback if no numeric features
+                latest_features = features_df.iloc[-1]
+                numeric_features = latest_features
             
             # Convert to numpy array and ensure correct size
             obs = numeric_features.values.astype(np.float32)
@@ -2830,10 +2851,13 @@ class MasterAgent:
                             features_df = pd.DataFrame([data])
                             ensemble_pred, ensemble_conf = self.ensemble_model.predict(features_df)
                         
+                        # Convert 3-class prediction to action
+                        action_map = {0: 'SELL', 1: 'BUY', 2: 'HOLD'}
+                        predicted_class = ensemble_pred[0]
                         ensemble_prediction = {
-                            'action': 'BUY' if ensemble_pred[0] > 0.5 else 'SELL' if ensemble_pred[0] < 0.3 else 'HOLD',
+                            'action': action_map.get(predicted_class, 'HOLD'),
                             'confidence': ensemble_conf[0],
-                            'probability': ensemble_pred[0]
+                            'probability': predicted_class
                         }
                         self.logger.info(f"🎯 Ensemble prediction: {ensemble_prediction}")
                 except Exception as e:
@@ -2879,8 +2903,11 @@ class MasterAgent:
                             self.logger.warning(f"Unexpected LSTM conf type: {type(lstm_conf)}")
                             lstm_conf_val = 0.5
                         
+                        # Convert LSTM prediction to 3-class action
+                        action_map = {0: 'SELL', 1: 'BUY', 2: 'HOLD'}
+                        predicted_class = int(round(lstm_pred_val)) if 0 <= lstm_pred_val <= 2 else 2
                         lstm_prediction = {
-                            'action': 'BUY' if lstm_pred_val > 0.6 else 'SELL' if lstm_pred_val < 0.4 else 'HOLD',
+                            'action': action_map.get(predicted_class, 'HOLD'),
                             'confidence': lstm_conf_val,
                             'probability': lstm_pred_val
                         }
