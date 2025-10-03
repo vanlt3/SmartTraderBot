@@ -1,0 +1,39 @@
+2025-10-03 17:28:18,684 - root - ERROR - Bot startup error
+Traceback (most recent call last):
+  File "/workspace/start_bot.py", line 49, in run_bot_with_optimized_settings
+    from trading_bot import TradingBot
+ImportError: cannot import name 'TradingBot' from 'trading_bot' (/workspace/trading_bot.py)
+2025-10-03 17:28:48,599 - root - ERROR - Bot startup error
+Traceback (most recent call last):
+  File "/workspace/start_bot.py", line 56, in run_bot_with_optimized_settings
+    bot.api_manager.rate_limit_config.update(rate_limits)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'rate_limit_config'
+2025-10-03 17:29:15,323 - root - ERROR - Bot startup error
+Traceback (most recent call last):
+  File "/workspace/start_bot.py", line 58, in run_bot_with_optimized_settings
+    await bot.run()
+          ^^^^^^^
+AttributeError: 'TradingBotController' object has no attribute 'run'
+2025-10-03 17:29:58,515 - BotCore - INFO - 🚀 Starting Trading Bot (cycle interval: 60 minutes)
+2025-10-03 17:29:58,516 - BotCore - INFO - 🚀 Initializing Trading Bot...
+2025-10-03 17:29:58,517 - BotCore - INFO - ✅ Database initialized at trading_bot.db
+2025-10-03 17:30:01,081 - RLAgent - INFO - Đã tạo PPO model
+2025-10-03 17:30:01,082 - BotCore - INFO - 🤖 RL Agent initialized successfully
+2025-10-03 17:30:01,082 - BotCore - INFO - ✅ Trading Bot initialized successfully
+2025-10-03 17:30:01,761 - Discord - INFO - Discord notification sent successfully
+2025-10-03 17:30:02,769 - BotCore - INFO - 🎓 Checking AI model training status...
+2025-10-03 17:30:02,769 - BotCore - INFO - 📊 Fetching historical data for initial training...
+2025-10-03 17:30:02,775 - DataManager - INFO - Fetching XAUUSD (XAU_USD) H1 data from OANDA...
+2025-10-03 17:30:03,509 - DataManager - INFO - Đã lấy 499 candles cho XAUUSD H1
+2025-10-03 17:30:03,510 - BotCore - INFO - 📈 Fetched 499 historical records for XAUUSD
+2025-10-03 17:30:03,510 - DataManager - INFO - Fetching EURUSD (EUR_USD) H1 data from OANDA...
+2025-10-03 17:30:03,511 - BotCore - WARNING - Rate limit cho oanda, chờ 1.5s...
+2025-10-03 17:30:03,511 - DataManager - WARNING - Không thể lấy dữ liệu cho EURUSD (EUR_USD) H1
+2025-10-03 17:30:03,511 - DataManager - WARNING - OANDA variants cho EURUSD thất bại, thử alternative APIs...
+2025-10-03 17:30:03,511 - DataManager - INFO - 🔍 Fetching EURUSD via alternative data sources...
+2025-10-03 17:30:03,511 - DataManager - INFO - Fetching EURUSD từ Yahoo Finance (simulation)...
+2025-10-03 17:30:03,520 - DataManager - INFO - ✅ Mock data created cho EURUSD: 100 candles
+2025-10-03 17:30:03,520 - BotCore - INFO - 📈 Fetched 100 historical records for EURUSD
+2025-10-03 17:30:03,523 - BotCore - INFO - 🤖 Training ensemble model...
+2025-10-03 17:30:03,534 - MasterAgent - INFO - 🎓 Training AI models cho XAUUSD với 499 data points...

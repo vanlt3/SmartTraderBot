@@ -46,16 +46,16 @@ async def run_bot_with_optimized_settings():
     
     # Import and run the bot
     try:
-        from trading_bot import TradingBot
+        from trading_bot import TradingBotController
         
-        bot = TradingBot()
+        bot = TradingBotController()
         
         # Override rate limits if configured
         if rate_limits:
-            if hasattr(bot, 'api_manager'):
+            if hasattr(bot, 'api_manager') and bot.api_manager is not None:
                 bot.api_manager.rate_limit_config.update(rate_limits)
         
-        await bot.run()
+        await bot.start()
         
     except KeyboardInterrupt:
         print("\n🛑 Bot stopped by user")

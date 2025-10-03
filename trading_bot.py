@@ -762,6 +762,9 @@ class AdvancedFeatureEngineer:
         features_df = df.copy()
         
         try:
+            # Normalize column names for feature engineering - handle timeframe suffixes
+            features_df = self._normalize_column_names(features_df)
+            
             # 1. Các chỉ báo cơ bản
             features_df = self._add_basic_indicators(features_df)
             
@@ -792,6 +795,41 @@ class AdvancedFeatureEngineer:
             self.logger.error(f"Lỗi khi tính toán features: {e}")
         
         return features_df
+    
+    def _normalize_column_names(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Normalize column names for feature engineering"""
+        
+        # Check if we have standard OHLCV columns
+        required_columns = ['open', 'high', 'low', 'close', 'volume']
+        has_m15_timeframe = False
+        has_standard_columns = all(col in df.columns for col in required_columns)
+        
+        # If we don't have standard columns, try to extract from timeframe-suffixed columns
+        if not has_standard_columns:
+            # Priority order: M15 > H1 > H4 > D1
+            timeframes = ['M15', 'H1', 'H4', 'D1']
+            
+            for tf in timeframes:
+                col_mapping = {}
+                for col in required_columns:
+                    suffixed_col = f"{col}_{tf}"
+                    if suffixed_col in df.columns:
+                        col_mapping[suffixed_col] = col
+                
+                if len(col_mapping) >= 4:  # At least open, high, low, close
+                    df_normalized = df.copy()
+                    df_normalized = df_normalized.rename(columns=col_mapping)
+                    
+                    # If volume is missing, create a placeholder
+                    if 'volume' not in df_normalized.columns:
+                        df_normalized['volume'] = (df_normalized['high'] + df_normalized['low']) / 2
+                    
+                    # Keep original datetime column
+                    df_normalized['datetime'] = df['datetime']
+                    return df_normalized
+        
+        # If we already have standard columns, return as-is
+        return df
     
     def _add_basic_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
         """Thêm các chỉ báo kỹ thuật cơ bản"""
@@ -1547,16 +1585,23 @@ class EnsembleModel:
     def predict(self, X: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
         """Dự đoán với ensemble"""
         
+        # Ensure prediction features match training features
+        try:
+            X_normalized = self._normalize_prediction_features(X)
+        except Exception as e:
+            self.logger.warning(f"Feature normalization failed: {e}")
+            return np.zeros(len(X)), np.ones(len(X)) * 0.5
+        
         # Base model predictions
-        base_predictions = np.zeros((len(X), len(self.models)))
+        base_predictions = np.zeros((len(X_normalized), len(self.models)))
         
         for i, (name, model) in enumerate(self.models.items()):
             try:
                 if hasattr(model, 'predict_proba'):
-                    base_predictions[:, i] = model.predict_proba(X)[:, 1]
+                    base_predictions[:, i] = model.predict_proba(X_normalized)[:, 1]
                 else:
                     # Fallback to decision function if predict_proba is not available
-                    predictions = model.decision_function(X)
+                    predictions = model.decision_function(X_normalized)
                     scaler = MinMaxScaler()
                     predictions = scaler.fit_transform(predictions.reshape(-1, 1)).flatten()
                     base_predictions[:, i] = predictions
@@ -1572,6 +1617,52 @@ class EnsembleModel:
         meta_predictions = self.meta_model.predict_proba(base_predictions)
         
         return np.argmax(meta_predictions, axis=1), meta_predictions[:, 1]
+    
+    def _normalize_prediction_features(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Normalize prediction features to match training features"""
+        
+        # Get training feature names from the first model
+        if self.models:
+            first_model_name = next(iter(self.models.keys()))
+            first_model = self.models[first_model_name]
+            
+            if hasattr(first_model, 'feature_names_in_'):
+                expected_features = first_model.feature_names_in_
+            else:
+                # If feature names not available, use column names as-is
+                return X
+            
+            # Map current columns to expected features
+            feature_map = {}
+            for col in expected_features:
+                # Try exact match first
+                if col in X.columns:
+                    feature_map[col] = col
+                    continue
+                
+                # Try removing timeframe suffix
+                for suffix in ['_M15', '_H1', '_H4', '_D1']:
+                    suffixed_col = f"{col}{suffix}"
+                    if suffixed_col in X.columns:
+                        feature_map[col] = suffixed_col
+                        break
+                
+                # If still not found, create default value
+                if col not in feature_map:
+                    feature_map[col] = None
+            
+            # Create normalized DataFrame
+            normalized_X = pd.DataFrame()
+            for expected_col, actual_col in feature_map.items():
+                if actual_col and actual_col in X.columns:
+                    normalized_X[expected_col] = X[actual_col]
+                else:
+                    # Use default values - this may not work well but prevents crashes
+                    normalized_X[expected_col] = 0.5 if 'prob' in expected_col.lower() else 0
+            
+            return normalized_X
+        
+        return X
 
 # ===== LSTM MODEL VỚI ATTENTION =====
 class LSTMModel:
@@ -2267,8 +2358,24 @@ class MasterAgent:
                     else:
                         # Convert data to DataFrame for ensemble prediction
                         import pandas as pd
-                        features_df = pd.DataFrame([data])
-                        ensemble_pred, ensemble_conf = self.ensemble_model.predict(features_df)
+                        
+                        # Convert enriched DataFrame to prediction-ready format
+                        if isinstance(data, pd.DataFrame):
+                            # Use only the latest row (most recent data)
+                            latest_data = data.iloc[-1:].copy()
+                            
+                            # Remove non-feature columns for prediction
+                            prediction_features = latest_data.drop(
+                                columns=[col for col in latest_data.columns 
+                                        if col in ['datetime', 'timestamp'] or col.startswith('_')]
+                            )
+                            
+                            ensemble_pred, ensemble_conf = self.ensemble_model.predict(prediction_features)
+                        else:
+                            # Handle dict/other data types
+                            features_df = pd.DataFrame([data])
+                            ensemble_pred, ensemble_conf = self.ensemble_model.predict(features_df)
+                        
                         ensemble_prediction = {
                             'action': 'BUY' if ensemble_pred[0] > 0.5 else 'SELL' if ensemble_pred[0] < 0.3 else 'HOLD',
                             'confidence': ensemble_conf[0],
@@ -2287,18 +2394,39 @@ class MasterAgent:
                         self.logger.warning("LSTM model chưa được huấn luyện")
                         lstm_prediction = None
                     else:
-                        lstm_pred, lstm_conf = self.lstm_model.predict(data)
+                        # Prepare data for LSTM prediction
+                        if isinstance(data, pd.DataFrame):
+                            # Use only the latest rows for sequence prediction
+                            seq_len = getattr(self.lstm_model, 'sequence_length', 50)
+                            lstm_data = data.tail(seq_len + 1).copy()
+                            
+                            # Remove non-feature columns
+                            lstm_features = lstm_data.drop(
+                                columns=[col for col in lstm_data.columns 
+                                        if col in ['datetime', 'timestamp'] or col.startswith('_')]
+                            ).fillna(0)
+                        else:
+                            # Handle dict/other data types
+                            lstm_features = pd.DataFrame([data]).fillna(0)
+                        
+                        lstm_pred, lstm_conf = self.lstm_model.predict(lstm_features)
                         
                         # Handle array inputs properly
                         if isinstance(lstm_pred, np.ndarray):
                             lstm_pred_val = lstm_pred[0] if len(lstm_pred) > 0 else 0.5
-                        else:
+                        elif isinstance(lstm_pred, (int, float)):
                             lstm_pred_val = float(lstm_pred)
+                        else:
+                            self.logger.warning(f"Unexpected LSTM pred type: {type(lstm_pred)}")
+                            lstm_pred_val = 0.5
                             
                         if isinstance(lstm_conf, np.ndarray):
                             lstm_conf_val = lstm_conf[0] if len(lstm_conf) > 0 else 0.5
-                        else:
+                        elif isinstance(lstm_conf, (int, float)):
                             lstm_conf_val = float(lstm_conf)
+                        else:
+                            self.logger.warning(f"Unexpected LSTM conf type: {type(lstm_conf)}")
+                            lstm_conf_val = 0.5
                         
                         lstm_prediction = {
                             'action': 'BUY' if lstm_pred_val > 0.6 else 'SELL' if lstm_pred_val < 0.4 else 'HOLD',
@@ -3909,6 +4037,18 @@ class TradingBotController:
                                         combined_df.index.name = 'datetime'
                                         combined_df = combined_df.reset_index()
                                 
+                                # Normalize datetime columns for merging - handle timezone mismatch
+                                if 'datetime' in df_with_timeframe.columns:
+                                    # Convert both datetime columns to UTC/naive for compatibility
+                                    if pd.api.types.is_datetime64tz_ns_dtype(combined_df['datetime']):
+                                        combined_df['datetime'] = combined_df['datetime'].dt.tz_localize(None)
+                                    if pd.api.types.is_datetime64tz_ns_dtype(df_with_timeframe['datetime']):
+                                        df_with_timeframe['datetime'] = df_with_timeframe['datetime'].dt.tz_localize(None)
+                                    
+                                    # Ensure both datetime columns are the same type
+                                    combined_df['datetime'] = pd.to_datetime(combined_df['datetime'])
+                                    df_with_timeframe['datetime'] = pd.to_datetime(df_with_timeframe['datetime'])
+                                
                                 combined_df = pd.merge(combined_df, df_with_timeframe, on='datetime', how='outer', suffixes=('', f'_{timeframe}'))
                             except Exception as merge_error:
                                 self.logger.warning(f"Failed to merge {symbol} {timeframe} data: {merge_error}")
@@ -4197,9 +4337,15 @@ class TradingBotController:
                     
                     # Create target (simplified: +1 if price went up next period, 0 otherwise)
                     if len(df) > 1:
-                        current_price = df['close'].iloc[-1]
-                        next_price = df['close'].iloc[-2]
-                        target = 1 if current_price > next_price else 0
+                        # Handle different column naming patterns
+                        price_columns = [col for col in df.columns if 'close' in col.lower()]
+                        if price_columns:
+                            price_col = price_columns[0]  # Use first close column found
+                            current_price = df[price_col].iloc[-1]
+                            next_price = df[price_col].iloc[-2]
+                            target = 1 if current_price > next_price else 0
+                        else:
+                            target = 0  # Default if no price column found
                         
                         self.auto_retrain_manager.online_manager.update_model(symbol, latest_features, float(target))
             
@@ -4216,12 +4362,22 @@ class TradingBotController:
             combined_data = pd.DataFrame()
             
             for symbol, df in market_data.items():
-                if not df.empty:
+                # Ensure df is a DataFrame and not empty
+                if isinstance(df, pd.DataFrame) and not df.empty:
                     symbol_data = df.copy()
                     symbol_data['symbol'] = symbol
                     combined_data = pd.concat([combined_data, symbol_data], ignore_index=True)
+                elif isinstance(df, dict):
+                    # Skip dict entries - convert to DataFrame if possible
+                    try:
+                        temp_df = pd.DataFrame([df])
+                        if len(temp_df) > 0:
+                            temp_df['symbol'] = symbol
+                            combined_data = pd.concat([combined_data, temp_df], ignore_index=True)
+                    except Exception:
+                        continue  # Skip if conversion fails
             
-            if not combined_data.empty:
+            if isinstance(combined_data, pd.DataFrame) and not combined_data.empty:
                 retrain_conditions = self.auto_retrain_manager.check_retrain_conditions(combined_data)
                 
                 if retrain_conditions['should_retrain']:
