@@ -1,18 +1,20 @@
 # Trading Bot Configuration
 # Modify these settings to optimize performance and API usage
 
-# API Rate Limiting (requests per minute)
+# API Rate Limiting (requests per minute) - Optimized for stability
 rate_limits:
-  oanda: 20          # Reduced from 100 to be conservative
-  finnhub: 60
-  newsapi: 1000
-  alpha_vantage: 5
+  oanda: 15          # Very conservative to avoid rate limits
+  finnhub: 30        # Reduced
+  newsapi: 500       # Reduced
+  alpha_vantage: 3   # Reduced
+  marketaux: 50      # Added
+  yahoo_finance: 1000 # Added
 
-# Request delays (seconds between API calls)
+# Request delays (seconds between API calls) - Increased for stability
 api_delays:
-  between_symbols: 1.0      # Wait between different symbols
-  between_timeframes: 0.5  # Wait between different timeframes
-  retry_delay: 2.0         # Base delay for retries
+  between_symbols: 1.5      # Increased wait between different symbols
+  between_timeframes: 1.0  # Increased wait between different timeframes
+  retry_delay: 3.0         # Increased base delay for retries
 
 # OANDA API Configuration  
 oanda:
