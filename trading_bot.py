@@ -477,17 +477,24 @@ class EnhancedDataManager:
         """Lấy dữ liệu thị trường từ OANDA API với fallback symbols"""
         
         # Try multiple symbol mappings for better compatibility
-        for symbol_variant in Config.ALTERNATIVE_SYMBOLS.get(symbol, [symbol]):
+        symbol_variants = [symbol]
+        symbol_variants.extend(
+            alt for alt in Config.ALTERNATIVE_SYMBOLS.get(symbol, [])
+            if alt not in symbol_variants
+        )
+
+        for symbol_variant in symbol_variants:
             try:
-                # Check if this variant is supported by Oanda
-                if symbol_variant not in Config.SYMBOL_MAPPING:
-                    continue
-                    
                 oanda_symbol = self._get_oanda_symbol(symbol_variant)
                 url = f"{Config.OANDA_URL}/instruments/{oanda_symbol}/candles"
-                
+
                 # Map timeframe to OANDA format
                 tf_mapping = {"M15": "M15", "H1": "H1", "H4": "H4", "D1": "D"}
+                if timeframe not in tf_mapping:
+                    self.logger.warning(
+                        f"Timeframe {timeframe} không được hỗ trợ cho OANDA fetch"
+                    )
+                    break
                 params = {
                     'count': min(count, 5000),  # OANDA limit
                     'granularity': tf_mapping[timeframe],
