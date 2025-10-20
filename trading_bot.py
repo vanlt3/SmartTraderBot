@@ -1263,14 +1263,35 @@ class NewsEconomicManager:
         return news_data
     
     async def _fetch_finnhub_news(self, symbol: str) -> List[Dict]:
-        """Fetch news từ Finnhub - Skip FinnHub due to invalid API key for now"""
-        # Skip FinnHub due to invalid API key (returns 401)
-        # Return empty list to avoid crashes
-        if Config.FINNHUB_API_KEY == "YOUR_VALID_FINNHUB_KEY_HERE":
-            # Only log once per session to reduce noise
+        """Fetch news from Finnhub"""
+        if not Config.FINNHUB_API_KEY or Config.FINNHUB_API_KEY == "YOUR_VALID_FINNHUB_KEY_HERE":
             if not hasattr(self, '_finnhub_warning_logged'):
-                self.logger.warning("Skipping FinnHub news due to invalid API key (set FINNHUB_API_KEY in config)")
+                self.logger.warning("Skipping Finnhub news due to invalid or missing API key.")
                 self._finnhub_warning_logged = True
+            return []
+
+        try:
+            end_date = datetime.now().strftime('%Y-%m-%d')
+            start_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+
+            url = "https://finnhub.io/api/v1/company-news"
+            params = {
+                'symbol': symbol,
+                'from': start_date,
+                'to': end_date,
+                'token': Config.FINNHUB_API_KEY
+            }
+
+            data = await self.api_manager._make_request(url, params=params, api_name='finnhub')
+
+            if data and isinstance(data, list):
+                return data
+            elif data:
+                self.logger.warning(f"Finnhub returned unexpected data type: {type(data)}")
+
+        except Exception as e:
+            self.logger.error(f"Error fetching Finnhub news for {symbol}: {e}")
+
         return []
     
     async def _fetch_marketaux_news(self, symbol: str) -> List[Dict]:
